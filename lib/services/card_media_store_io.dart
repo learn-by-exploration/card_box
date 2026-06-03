@@ -11,17 +11,30 @@ Future<String> storePickedImage(
   required String cardId,
   required String side,
 }) async {
+  return storeImageBytes(
+    await file.readAsBytes(),
+    sourcePath: file.path,
+    cardId: cardId,
+    side: side,
+  );
+}
+
+Future<String> storeImageBytes(
+  Uint8List bytes, {
+  required String sourcePath,
+  required String cardId,
+  required String side,
+}) async {
   final directory = await getApplicationDocumentsDirectory();
   final imageDirectory = Directory('${directory.path}/card_images');
   if (!await imageDirectory.exists()) {
     await imageDirectory.create(recursive: true);
   }
-  final extension = _extensionFor(file.path);
+  final extension = _extensionFor(sourcePath);
   final safeCardId = cardId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
   final target = File(
     '${imageDirectory.path}/${safeCardId}_${side}_${DateTime.now().microsecondsSinceEpoch}$extension',
   );
-  final bytes = await file.readAsBytes();
   await target.writeAsBytes(bytes, flush: true);
   return target.path;
 }
@@ -63,18 +76,12 @@ Future<String> storeImportedImageBytes({
   required Uint8List bytes,
   required String extension,
 }) async {
-  final directory = await getApplicationDocumentsDirectory();
-  final imageDirectory = Directory('${directory.path}/card_images');
-  if (!await imageDirectory.exists()) {
-    await imageDirectory.create(recursive: true);
-  }
-  final safeCardId = cardId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-  final safeExtension = _extensionFor('import$extension');
-  final target = File(
-    '${imageDirectory.path}/${safeCardId}_${side}_${DateTime.now().microsecondsSinceEpoch}$safeExtension',
+  return storeImageBytes(
+    bytes,
+    sourcePath: 'import$extension',
+    cardId: cardId,
+    side: side,
   );
-  await target.writeAsBytes(bytes, flush: true);
-  return target.path;
 }
 
 String _extensionFor(String path) {

@@ -64,6 +64,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
+                  const PopupMenuItem(
+                    value: _HomeMenuAction.summary,
+                    child: Row(
+                      children: [
+                        Icon(Icons.space_dashboard_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('Wallet summary'),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem(
                     value: _HomeMenuAction.backup,
                     child: const Row(
@@ -97,8 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
-                _CompactOverviewPanel(cards: allCards),
-                const SizedBox(height: 12),
                 TextField(
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
@@ -145,26 +153,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      FilterChip(
-                        label: const Text('All categories'),
-                        selected: _category == null,
-                        onSelected: (_) => setState(() => _category = null),
+                  width: double.infinity,
+                  child: DropdownButtonFormField<CardCategory?>(
+                    initialValue: _category,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<CardCategory?>(
+                        value: null,
+                        child: Text('All categories'),
                       ),
-                      const SizedBox(width: 8),
-                      for (final category in CardCategory.values) ...[
-                        FilterChip(
-                          label: Text(category.label),
-                          selected: _category == category,
-                          onSelected: (_) =>
-                              setState(() => _category = category),
+                      ...CardCategory.values.map(
+                        (category) => DropdownMenuItem<CardCategory?>(
+                          value: category,
+                          child: Text(category.label),
                         ),
-                        const SizedBox(width: 8),
-                      ],
+                      ),
                     ],
+                    onChanged: (value) => setState(() => _category = value),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -377,6 +385,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         );
+      case _HomeMenuAction.summary:
+        _showWalletSummary();
       case _HomeMenuAction.backup:
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -432,11 +442,24 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     return filtered;
   }
+
+  Future<void> _showWalletSummary() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: _CompactOverviewPanel(cards: widget.repository.cards),
+        ),
+      ),
+    );
+  }
 }
 
 enum _StatusFilter { all, ready, needsTest, reference }
 
-enum _HomeMenuAction { archived, backup, lock }
+enum _HomeMenuAction { archived, summary, backup, lock }
 
 class _CompactOverviewPanel extends StatelessWidget {
   const _CompactOverviewPanel({required this.cards});

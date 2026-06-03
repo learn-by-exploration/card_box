@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app_settings/app_settings.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 
 import 'package:card_box/models/compatibility_status.dart';
@@ -94,7 +95,12 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
             consentGranted: _nfcConsent,
             scanning: _scanning,
             onScan: _nfcConsent ? _scanNfc : null,
+            onOpenSettings: _openNfcSettings,
           ),
+          if (_selectedStatus == CompatibilityStatus.androidHceCandidate) ...[
+            const SizedBox(height: 12),
+            const _EmulationNote(),
+          ],
           const SizedBox(height: 12),
           DropdownButtonFormField<CompatibilityStatus>(
             initialValue: _selectedStatus,
@@ -159,6 +165,11 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   }
 
   Future<void> _scanNfc() async {
+    if (_availability == NfcAvailability.disabled) {
+      await _openNfcSettings();
+      await _loadAvailability();
+      return;
+    }
     final approved = await _confirmInterfaceUse();
     if (!approved) {
       return;
@@ -210,6 +221,14 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
       ),
     );
     return decision ?? false;
+  }
+
+  Future<void> _openNfcSettings() async {
+    try {
+      await AppSettings.openAppSettingsPanel(AppSettingsPanelType.nfc);
+    } catch (_) {
+      await AppSettings.openAppSettings(type: AppSettingsType.nfc);
+    }
   }
 }
 
@@ -307,6 +326,7 @@ class _NfcPanel extends StatelessWidget {
     required this.consentGranted,
     required this.scanning,
     required this.onScan,
+    required this.onOpenSettings,
   });
 
   final bool loadingAvailability;
@@ -314,6 +334,7 @@ class _NfcPanel extends StatelessWidget {
   final bool consentGranted;
   final bool scanning;
   final VoidCallback? onScan;
+  final Future<void> Function() onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -350,6 +371,19 @@ class _NfcPanel extends StatelessWidget {
               icon: const Icon(Icons.nfc),
               label: Text(scanning ? 'Scanning...' : 'Scan NFC card'),
             ),
+            if (availability == NfcAvailability.disabled) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => onOpenSettings(),
+                icon: const Icon(Icons.settings_outlined),
+                label: const Text('Turn on NFC'),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Android does not show a normal runtime permission prompt for NFC. This opens the system NFC panel instead.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
             if (!consentGranted) ...[
               const SizedBox(height: 8),
               const Text(
@@ -357,6 +391,32 @@ class _NfcPanel extends StatelessWidget {
                 style: TextStyle(fontSize: 12),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmulationNote extends StatelessWidget {
+  const _EmulationNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Possible Android emulation candidate',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This card exposed ISO-DEP style behavior, which is the family Android Host Card Emulation works with. That does not mean the phone can replace this card today. It means the card is worth deeper Android-only investigation later.',
+            ),
           ],
         ),
       ),

@@ -47,7 +47,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Card Box keeps data local. Create a real backup file that includes card data and saved photos. Use encrypted backup when you want password protection for the exported file.',
+                    'Card Box keeps data local. Create a real backup file that includes card data and saved photos. Backups are saved to Downloads when the device exposes that folder, otherwise to the app backup folder. Use encrypted backup when you want password protection for the exported file.',
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -179,8 +179,8 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
       });
     } on UnsupportedError catch (error) {
       setState(() => _message = error.message ?? 'Backup export unavailable.');
-    } catch (_) {
-      setState(() => _message = 'Backup export failed.');
+    } catch (error) {
+      setState(() => _message = 'Backup export failed: $error');
     } finally {
       widget.appLockService.endTrustedExternalFlow();
       if (mounted) {
@@ -227,8 +227,8 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
       setState(() => _message = error.message);
     } on UnsupportedError catch (error) {
       setState(() => _message = error.message ?? 'Import unavailable.');
-    } catch (_) {
-      setState(() => _message = 'Import failed.');
+    } catch (error) {
+      setState(() => _message = 'Import failed: $error');
     } finally {
       widget.appLockService.endTrustedExternalFlow();
       if (mounted) {

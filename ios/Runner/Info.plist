@@ -34,6 +34,8 @@
 	<string>Card Box uses NFC only after you choose to test or read a card.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Card Box uses your photo library when you choose an existing card image.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Card Box may save scanned card images temporarily so you can review and store them in the app.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

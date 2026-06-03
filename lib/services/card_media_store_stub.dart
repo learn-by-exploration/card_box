@@ -11,6 +11,15 @@ Future<String> storePickedImage(
   return file.path;
 }
 
+Future<String> storeImageBytes(
+  Uint8List bytes, {
+  required String sourcePath,
+  required String cardId,
+  required String side,
+}) async {
+  return '$cardId-$side';
+}
+
 Future<void> deleteStoredImage(String path) async {}
 
 Future<bool> storedImageExists(String path) async {

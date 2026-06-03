@@ -31,13 +31,17 @@ dependencies:
   flutter:
     sdk: flutter
 
+  app_settings:
+    path: third_party/app_settings
   barcode: ^2.2.9
   barcode_widget: ^2.0.4
   cryptography: ^2.9.0
   cupertino_icons: ^1.0.8
+  edge_detection_scan: ^0.0.1
   file_selector: ^1.1.0
   flutter_secure_storage: ^10.3.1
   image_picker: ^1.2.2
+  image_cropper: ^12.2.1
   local_auth: ^3.0.1
   mobile_scanner:
     path: third_party/mobile_scanner

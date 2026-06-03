@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -14,9 +13,6 @@ class BackupFileService {
     String fileNamePrefix = 'card_box_backup',
   }) async {
     final backupDirectory = await _backupDirectory();
-    if (backupDirectory == null) {
-      return null;
-    }
     if (!await backupDirectory.exists()) {
       await backupDirectory.create(recursive: true);
     }
@@ -57,31 +53,16 @@ class BackupFileService {
     return '${fileNamePrefix}_$year$month${day}_$hour$minute$second.json';
   }
 
-  Future<Directory?> _backupDirectory() async {
-    if (_supportsDirectoryPicking()) {
-      final path = await getDirectoryPath(
-        confirmButtonText: 'Save backup here',
-      );
-      if (path == null || path.isEmpty) {
-        return null;
+  Future<Directory> _backupDirectory() async {
+    try {
+      final downloads = await getDownloadsDirectory();
+      if (downloads != null) {
+        return Directory('${downloads.path}/Card Box');
       }
-      return Directory(path);
+    } on UnsupportedError {
+      // Fall through to app documents below.
     }
     final directory = await getApplicationDocumentsDirectory();
     return Directory('${directory.path}/backups');
-  }
-
-  bool _supportsDirectoryPicking() {
-    if (kIsWeb) {
-      return false;
-    }
-    return switch (defaultTargetPlatform) {
-      TargetPlatform.android => true,
-      TargetPlatform.linux => true,
-      TargetPlatform.macOS => true,
-      TargetPlatform.windows => true,
-      TargetPlatform.iOS => false,
-      TargetPlatform.fuchsia => false,
-    };
   }
 }

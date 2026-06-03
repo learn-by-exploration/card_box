@@ -152,16 +152,20 @@ class _EditCardScreenState extends State<EditCardScreen> {
             _PermissionNote(
               icon: Icons.photo_camera,
               text:
-                  'Photo capture asks before using the camera. You can also choose an existing card image from the library.',
+                  'For the cleanest card image, start with Scan card. You can still fall back to the camera or choose an existing image.',
             ),
             const SizedBox(height: 12),
             _PhotoEditor(
               title: 'Front photo',
               imagePath: _frontImagePath,
               busy: _busyFrontCapture,
+              onScan: () => _startScanFlow(side: 'front'),
               onCapture: () => _startPhotoFlow(side: 'front', fromCamera: true),
               onLibrary: () =>
                   _startPhotoFlow(side: 'front', fromCamera: false),
+              onEdit: _frontImagePath.isEmpty
+                  ? null
+                  : () => _editPhoto(side: 'front'),
               onClear: _frontImagePath.isEmpty
                   ? null
                   : () => _clearPhoto(side: 'front'),
@@ -171,8 +175,12 @@ class _EditCardScreenState extends State<EditCardScreen> {
               title: 'Back photo',
               imagePath: _backImagePath,
               busy: _busyBackCapture,
+              onScan: () => _startScanFlow(side: 'back'),
               onCapture: () => _startPhotoFlow(side: 'back', fromCamera: true),
               onLibrary: () => _startPhotoFlow(side: 'back', fromCamera: false),
+              onEdit: _backImagePath.isEmpty
+                  ? null
+                  : () => _editPhoto(side: 'back'),
               onClear: _backImagePath.isEmpty
                   ? null
                   : () => _clearPhoto(side: 'back'),
@@ -327,6 +335,59 @@ class _EditCardScreenState extends State<EditCardScreen> {
     }
   }
 
+  Future<void> _startScanFlow({required String side}) async {
+    final approved = await _confirmInterfaceUse(
+      title: 'Scan card with edge detection?',
+      message:
+          'Card Box will open a card scanning interface and try to capture a cleaner, flatter image of the $side of this card.',
+      actionLabel: 'Start scan',
+    );
+    if (!approved) {
+      return;
+    }
+    await _scanCardPhoto(side: side);
+  }
+
+  Future<void> _scanCardPhoto({required String side}) async {
+    widget.appLockService.beginTrustedExternalFlow();
+    setState(() {
+      if (side == 'front') {
+        _busyFrontCapture = true;
+      } else {
+        _busyBackCapture = true;
+      }
+    });
+    try {
+      final path = await _mediaService.scanCardPhoto(
+        cardId: _draftCardId,
+        side: side,
+      );
+      if (path == null || !mounted) {
+        return;
+      }
+      final previousPath = side == 'front' ? _frontImagePath : _backImagePath;
+      await _deleteIfTemporary(previousPath, side: side);
+      setState(() {
+        if (side == 'front') {
+          _frontImagePath = path;
+        } else {
+          _backImagePath = path;
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (side == 'front') {
+            _busyFrontCapture = false;
+          } else {
+            _busyBackCapture = false;
+          }
+        });
+      }
+      widget.appLockService.endTrustedExternalFlow();
+    }
+  }
+
   Future<void> _startBarcodeScanFlow() async {
     final approved = await _confirmInterfaceUse(
       title: 'Use camera scanner?',
@@ -358,6 +419,50 @@ class _EditCardScreenState extends State<EditCardScreen> {
       _barcodePayloadController.text = scannedCode.payload;
       _barcodeFormatController.text = _formatLabel(scannedCode.format);
     });
+  }
+
+  Future<void> _editPhoto({required String side}) async {
+    final currentPath = side == 'front' ? _frontImagePath : _backImagePath;
+    if (currentPath.isEmpty) {
+      return;
+    }
+    widget.appLockService.beginTrustedExternalFlow();
+    setState(() {
+      if (side == 'front') {
+        _busyFrontCapture = true;
+      } else {
+        _busyBackCapture = true;
+      }
+    });
+    try {
+      final editedPath = await _mediaService.editPhoto(
+        existingPath: currentPath,
+        cardId: _draftCardId,
+        side: side,
+      );
+      if (editedPath == null || !mounted) {
+        return;
+      }
+      await _deleteIfTemporary(currentPath, side: side);
+      setState(() {
+        if (side == 'front') {
+          _frontImagePath = editedPath;
+        } else {
+          _backImagePath = editedPath;
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (side == 'front') {
+            _busyFrontCapture = false;
+          } else {
+            _busyBackCapture = false;
+          }
+        });
+      }
+      widget.appLockService.endTrustedExternalFlow();
+    }
   }
 
   String _formatLabel(String rawFormat) {
@@ -543,7 +648,8 @@ class _AddFlowGuide extends StatelessWidget {
             const SizedBox(height: 8),
             const _GuideLine(
               step: '2',
-              text: 'Add front and back photos if you want a visual copy.',
+              text:
+                  'Scan the front and back for cleaner edges, or add photos if that is easier.',
             ),
             const SizedBox(height: 8),
             const _GuideLine(
@@ -623,16 +729,20 @@ class _PhotoEditor extends StatelessWidget {
     required this.title,
     required this.imagePath,
     required this.busy,
+    required this.onScan,
     required this.onCapture,
     required this.onLibrary,
+    this.onEdit,
     this.onClear,
   });
 
   final String title;
   final String imagePath;
   final bool busy;
+  final VoidCallback onScan;
   final VoidCallback onCapture;
   final VoidCallback onLibrary;
+  final VoidCallback? onEdit;
   final VoidCallback? onClear;
 
   @override
@@ -658,15 +768,26 @@ class _PhotoEditor extends StatelessWidget {
               runSpacing: 8,
               children: [
                 FilledButton.icon(
+                  onPressed: busy ? null : onScan,
+                  icon: const Icon(Icons.document_scanner_outlined),
+                  label: Text(busy ? 'Opening...' : 'Scan card'),
+                ),
+                OutlinedButton.icon(
                   onPressed: busy ? null : onCapture,
                   icon: const Icon(Icons.photo_camera),
-                  label: Text(busy ? 'Opening...' : 'Use camera'),
+                  label: const Text('Use camera'),
                 ),
                 OutlinedButton.icon(
                   onPressed: busy ? null : onLibrary,
                   icon: const Icon(Icons.photo_library),
                   label: const Text('Choose photo'),
                 ),
+                if (onEdit != null)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : onEdit,
+                    icon: const Icon(Icons.crop_rotate),
+                    label: const Text('Edit photo'),
+                  ),
                 if (onClear != null)
                   IconButton(
                     tooltip: 'Remove photo',

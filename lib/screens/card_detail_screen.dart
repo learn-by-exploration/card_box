@@ -207,6 +207,9 @@ class _ActionHeader extends StatelessWidget {
     if (card.compatibilityStatus == CompatibilityStatus.nfcReadable) {
       return 'This card has readable NFC data. Keep the saved summary and retest any time.';
     }
+    if (card.compatibilityStatus == CompatibilityStatus.androidHceCandidate) {
+      return 'This card exposed ISO-DEP style behavior, so it may be worth later Android-only emulation research. It is not emulated by Card Box today.';
+    }
     if (card.compatibilityStatus == CompatibilityStatus.referenceOnly) {
       return 'Use this as a quick visual reference and keep the physical card with you.';
     }
