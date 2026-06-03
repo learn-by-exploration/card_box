@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -291,6 +292,12 @@ void main() {
     );
 
     expect(find.text('Card Box'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Office access card'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Office access card'), findsOneWidget);
     expect(find.text('Supermarket loyalty'), findsOneWidget);
   });

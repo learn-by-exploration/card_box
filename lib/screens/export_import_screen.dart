@@ -243,75 +243,149 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
     required bool confirmPassword,
     required String helperText,
   }) async {
-    final passwordController = TextEditingController();
-    final confirmController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final password = await showDialog<String>(
+    return showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(helperText),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: passwordController,
-                decoration: const InputDecoration(labelText: 'Backup password'),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.trim().length < 8) {
-                    return 'Use at least 8 characters';
-                  }
-                  return null;
-                },
-              ),
-              if (confirmPassword) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: confirmController,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm password',
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value != passwordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ],
-          ),
+      isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.92,
+        child: _PasswordPromptSheet(
+          title: title,
+          actionLabel: actionLabel,
+          confirmPassword: confirmPassword,
+          helperText: helperText,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-              Navigator.of(context).pop(passwordController.text.trim());
-            },
-            child: Text(actionLabel),
-          ),
-        ],
       ),
     );
-    passwordController.dispose();
-    confirmController.dispose();
-    return password;
   }
 }
 
 enum _BackupExportMode { plain, encrypted }
+
+class _PasswordPromptSheet extends StatefulWidget {
+  const _PasswordPromptSheet({
+    required this.title,
+    required this.actionLabel,
+    required this.confirmPassword,
+    required this.helperText,
+  });
+
+  final String title;
+  final String actionLabel;
+  final bool confirmPassword;
+  final String helperText;
+
+  @override
+  State<_PasswordPromptSheet> createState() => _PasswordPromptSheetState();
+}
+
+class _PasswordPromptSheetState extends State<_PasswordPromptSheet> {
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 8,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(widget.helperText),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: const InputDecoration(
+                        labelText: 'Backup password',
+                      ),
+                      obscureText: true,
+                      textInputAction: widget.confirmPassword
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                      validator: (value) {
+                        if (value == null || value.trim().length < 8) {
+                          return 'Use at least 8 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (widget.confirmPassword) ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmController,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm password',
+                        ),
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        validator: (value) {
+                          if (value != _passwordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    if (!_formKey.currentState!.validate()) {
+                      return;
+                    }
+                    Navigator.of(context).pop(_passwordController.text.trim());
+                  },
+                  child: Text(widget.actionLabel),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _BackupSummaryCard extends StatelessWidget {
   const _BackupSummaryCard({required this.backup});

@@ -56,26 +56,34 @@ class CardTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                    Row(
                       children: [
-                        _MiniBadge(
-                          label: card.categoryLabel,
-                          background: colors.primaryContainer,
-                          foreground: colors.onPrimaryContainer,
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: _MiniBadge(
+                              label: _statusLabel(),
+                              background: _statusBackground(colors),
+                              foreground: _statusForeground(colors),
+                            ),
+                          ),
                         ),
-                        _MiniBadge(
-                          label: _statusLabel(),
-                          background: _statusBackground(colors),
-                          foreground: _statusForeground(colors),
+                        const SizedBox(width: 8),
+                        Text(
+                          card.hasBarcode ? 'Tap for code' : 'Tap for actions',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              const SizedBox(width: 8),
+              Icon(
+                card.hasBarcode
+                    ? Icons.qr_code_scanner_outlined
+                    : Icons.more_horiz,
+              ),
             ],
           ),
         ),
@@ -152,6 +160,8 @@ class _MiniBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,

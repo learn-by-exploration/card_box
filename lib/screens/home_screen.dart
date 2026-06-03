@@ -6,7 +6,9 @@ import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/archived_cards_screen.dart';
 import 'package:card_box/screens/app_lock_settings_screen.dart';
+import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
+import 'package:card_box/screens/compatibility_test_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/screens/export_import_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
@@ -44,168 +46,146 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: AppBar(
             title: const Text('Card Box'),
             actions: [
-              IconButton(
-                tooltip: archivedCount == 0
-                    ? 'Archived cards'
-                    : 'Archived cards ($archivedCount)',
-                icon: Badge.count(
-                  isLabelVisible: archivedCount > 0,
-                  count: archivedCount,
-                  child: const Icon(Icons.archive_outlined),
-                ),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ArchivedCardsScreen(
-                      repository: widget.repository,
-                      appLockService: widget.appLockService,
+              PopupMenuButton<_HomeMenuAction>(
+                tooltip: 'More',
+                onSelected: _handleMenuAction,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: _HomeMenuAction.archived,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.archive_outlined, size: 18),
+                        const SizedBox(width: 10),
+                        Text(
+                          archivedCount == 0
+                              ? 'Archived cards'
+                              : 'Archived cards ($archivedCount)',
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'App lock',
-                icon: Icon(
-                  widget.appLockService.lockEnabled
-                      ? Icons.lock_outline
-                      : Icons.shield_outlined,
-                ),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AppLockSettingsScreen(
-                      appLockService: widget.appLockService,
+                  PopupMenuItem(
+                    value: _HomeMenuAction.backup,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.ios_share, size: 18),
+                        SizedBox(width: 10),
+                        Text('Backup and import'),
+                      ],
                     ),
                   ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Export or import',
-                icon: const Icon(Icons.ios_share),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ExportImportScreen(
-                      repository: widget.repository,
-                      appLockService: widget.appLockService,
+                  PopupMenuItem(
+                    value: _HomeMenuAction.lock,
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.appLockService.lockEnabled
+                              ? Icons.lock_outline
+                              : Icons.shield_outlined,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text('App lock'),
+                      ],
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
           body: SafeArea(
-            child: Column(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Column(
+                _CompactOverviewPanel(cards: allCards),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search cards, issuers, notes, or codes',
+                  ),
+                  onChanged: (value) => setState(() => _query = value),
+                ),
+                const SizedBox(height: 16),
+                _SectionLabel(
+                  title: 'Your cards',
+                  trailing: Text(
+                    '${cards.length} shown',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<_StatusFilter>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: _StatusFilter.all,
+                        label: Text('All'),
+                      ),
+                      ButtonSegment(
+                        value: _StatusFilter.ready,
+                        label: Text('Ready'),
+                      ),
+                      ButtonSegment(
+                        value: _StatusFilter.needsTest,
+                        label: Text('Needs test'),
+                      ),
+                      ButtonSegment(
+                        value: _StatusFilter.reference,
+                        label: Text('Reference'),
+                      ),
+                    ],
+                    selected: {_statusFilter},
+                    onSelectionChanged: (selection) {
+                      setState(() => _statusFilter = selection.first);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
                     children: [
-                      _OverviewPanel(cards: allCards),
-                      const SizedBox(height: 12),
-                      TextField(
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Search cards, issuers, notes, or codes',
+                      FilterChip(
+                        label: const Text('All categories'),
+                        selected: _category == null,
+                        onSelected: (_) => setState(() => _category = null),
+                      ),
+                      const SizedBox(width: 8),
+                      for (final category in CardCategory.values) ...[
+                        FilterChip(
+                          label: Text(category.label),
+                          selected: _category == category,
+                          onSelected: (_) =>
+                              setState(() => _category = category),
                         ),
-                        onChanged: (value) => setState(() => _query = value),
-                      ),
-                      const SizedBox(height: 10),
-                      _QuickActionRow(
-                        onGeneral: () => _openAddCard(AddCardPreset.general),
-                        onBarcode: () => _openAddCard(AddCardPreset.barcode),
-                        onNfc: () => _openAddCard(AddCardPreset.nfc),
-                        onReference: () =>
-                            _openAddCard(AddCardPreset.reference),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: SegmentedButton<_StatusFilter>(
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(
-                              value: _StatusFilter.all,
-                              label: Text('All'),
-                            ),
-                            ButtonSegment(
-                              value: _StatusFilter.ready,
-                              label: Text('Ready'),
-                            ),
-                            ButtonSegment(
-                              value: _StatusFilter.needsTest,
-                              label: Text('Needs test'),
-                            ),
-                            ButtonSegment(
-                              value: _StatusFilter.reference,
-                              label: Text('Reference'),
-                            ),
-                          ],
-                          selected: {_statusFilter},
-                          onSelectionChanged: (selection) {
-                            setState(() => _statusFilter = selection.first);
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 40,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            FilterChip(
-                              label: const Text('All'),
-                              selected: _category == null,
-                              onSelected: (_) =>
-                                  setState(() => _category = null),
-                            ),
-                            const SizedBox(width: 8),
-                            for (final category in CardCategory.values) ...[
-                              FilterChip(
-                                label: Text(category.label),
-                                selected: _category == category,
-                                onSelected: (_) =>
-                                    setState(() => _category = category),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                          ],
-                        ),
-                      ),
+                        const SizedBox(width: 8),
+                      ],
                     ],
                   ),
                 ),
-                Expanded(
-                  child: cards.isEmpty
-                      ? _EmptyState(
-                          onAddCard: () => _openAddCard(AddCardPreset.general),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                          itemBuilder: (context, index) {
-                            final card = cards[index];
-                            return CardTile(
-                              card: card,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CardDetailScreen(
-                                    repository: widget.repository,
-                                    appLockService: widget.appLockService,
-                                    cardId: card.id,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemCount: cards.length,
-                        ),
-                ),
+                const SizedBox(height: 12),
+                if (cards.isEmpty)
+                  _EmptyState(onAddCard: _openAddCardPicker)
+                else ...[
+                  for (var index = 0; index < cards.length; index++) ...[
+                    CardTile(
+                      card: cards[index],
+                      onTap: () => _openCardActions(cards[index]),
+                    ),
+                    if (index != cards.length - 1) const SizedBox(height: 10),
+                  ],
+                ],
               ],
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
             icon: const Icon(Icons.add),
             label: const Text('Add card'),
-            onPressed: () => _openAddCard(AddCardPreset.general),
+            onPressed: _openAddCardPicker,
           ),
         );
       },
@@ -224,9 +204,201 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openAddCardPicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'How do you want to add it?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Pick the path that matches the card you are holding. You can still edit everything afterward.',
+              ),
+              const SizedBox(height: 12),
+              _AddPathTile(
+                icon: Icons.qr_code_2,
+                title: 'Barcode card',
+                subtitle: 'Great for loyalty, library, and membership cards',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openAddCard(AddCardPreset.barcode);
+                },
+              ),
+              _AddPathTile(
+                icon: Icons.nfc,
+                title: 'NFC / RFID card',
+                subtitle: 'Save it first, then test what this phone can read',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openAddCard(AddCardPreset.nfc);
+                },
+              ),
+              _AddPathTile(
+                icon: Icons.badge_outlined,
+                title: 'Reference card',
+                subtitle: 'Photos and notes for cards that stay physical',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openAddCard(AddCardPreset.reference);
+                },
+              ),
+              _AddPathTile(
+                icon: Icons.add_card,
+                title: 'General card',
+                subtitle: 'Start blank and decide the details yourself',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openAddCard(AddCardPreset.general);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openCardActions(WalletCard card) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(card.name, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                card.issuer.isEmpty ? card.categoryLabel : card.issuer,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              if (card.hasBarcode)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.fullscreen),
+                  title: const Text('Show code'),
+                  subtitle: const Text(
+                    'Open the full-screen barcode or QR view',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(this.context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BarcodePresentScreen(card: card),
+                      ),
+                    );
+                  },
+                ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Edit card'),
+                subtitle: const Text('Update details, photos, notes, or codes'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(this.context).push(
+                    MaterialPageRoute(
+                      builder: (_) => EditCardScreen(
+                        repository: widget.repository,
+                        appLockService: widget.appLockService,
+                        existingCard: card,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.visibility_outlined),
+                title: const Text('View details'),
+                subtitle: const Text('Open the full card detail screen'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(this.context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CardDetailScreen(
+                        repository: widget.repository,
+                        appLockService: widget.appLockService,
+                        cardId: card.id,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (!card.hasBarcode)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.nfc),
+                  title: const Text('Test NFC / RFID'),
+                  subtitle: const Text(
+                    'Check whether this phone can read the card',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(this.context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CompatibilityTestScreen(
+                          repository: widget.repository,
+                          appLockService: widget.appLockService,
+                          card: card,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleMenuAction(_HomeMenuAction action) {
+    switch (action) {
+      case _HomeMenuAction.archived:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ArchivedCardsScreen(
+              repository: widget.repository,
+              appLockService: widget.appLockService,
+            ),
+          ),
+        );
+      case _HomeMenuAction.backup:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExportImportScreen(
+              repository: widget.repository,
+              appLockService: widget.appLockService,
+            ),
+          ),
+        );
+      case _HomeMenuAction.lock:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                AppLockSettingsScreen(appLockService: widget.appLockService),
+          ),
+        );
+    }
+  }
+
   List<WalletCard> _filteredCards(List<WalletCard> cards) {
     final normalizedQuery = _query.trim().toLowerCase();
-    return cards.where((card) {
+    final filtered = cards.where((card) {
       final categoryMatches = _category == null || card.category == _category;
       final statusMatches = switch (_statusFilter) {
         _StatusFilter.all => true,
@@ -249,13 +421,25 @@ class _HomeScreenState extends State<HomeScreen> {
           ].any((value) => value.toLowerCase().contains(normalizedQuery));
       return categoryMatches && statusMatches && queryMatches;
     }).toList();
+    filtered.sort((a, b) {
+      if (a.favorite != b.favorite) {
+        return a.favorite ? -1 : 1;
+      }
+      if (a.hasBarcode != b.hasBarcode) {
+        return a.hasBarcode ? -1 : 1;
+      }
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return filtered;
   }
 }
 
 enum _StatusFilter { all, ready, needsTest, reference }
 
-class _OverviewPanel extends StatelessWidget {
-  const _OverviewPanel({required this.cards});
+enum _HomeMenuAction { archived, backup, lock }
+
+class _CompactOverviewPanel extends StatelessWidget {
+  const _CompactOverviewPanel({required this.cards});
 
   final List<WalletCard> cards;
 
@@ -272,124 +456,110 @@ class _OverviewPanel extends StatelessWidget {
           (card) => card.compatibilityStatus == CompatibilityStatus.untested,
         )
         .length;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8F3F0), Color(0xFFF7EEE6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your wallet',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              cards.isEmpty
+                  ? 'Start with the cards you actually use every week.'
+                  : '$readyToShow ready to show, $nfcReadable NFC-readable, $untested still untested.',
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _MetricTile(
+                    label: 'Cards',
+                    value: '${cards.length}',
+                    icon: Icons.wallet_outlined,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _MetricTile(
+                    label: 'Ready',
+                    value: '$readyToShow',
+                    icon: Icons.qr_code_2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _MetricTile(
+                    label: 'Need test',
+                    value: '$untested',
+                    icon: Icons.nfc,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Your everyday card wallet',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            cards.isEmpty
-                ? 'Start by adding the cards you reach for most often.'
-                : '$readyToShow ready to show, $nfcReadable NFC-readable, $untested still untested.',
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(label: 'Cards', value: '${cards.length}'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricTile(label: 'Ready', value: '$readyToShow'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricTile(label: 'Need test', value: '$untested'),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 }
 
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.label, required this.value});
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.title, this.trailing});
 
-  final String label;
-  final String value;
+  final String title;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ),
+        trailing ?? const SizedBox.shrink(),
+      ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, size: 16, color: colors.primary),
+          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 2),
           Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickActionRow extends StatelessWidget {
-  const _QuickActionRow({
-    required this.onGeneral,
-    required this.onBarcode,
-    required this.onNfc,
-    required this.onReference,
-  });
-
-  final VoidCallback onGeneral;
-  final VoidCallback onBarcode;
-  final VoidCallback onNfc;
-  final VoidCallback onReference;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 42,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          FilledButton.icon(
-            onPressed: onBarcode,
-            icon: const Icon(Icons.qr_code_2, size: 18),
-            label: const Text('Barcode card'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: onNfc,
-            icon: const Icon(Icons.nfc, size: 18),
-            label: const Text('NFC / RFID card'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: onReference,
-            icon: const Icon(Icons.badge, size: 18),
-            label: const Text('Reference card'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: onGeneral,
-            icon: const Icon(Icons.add_card, size: 18),
-            label: const Text('General'),
-          ),
         ],
       ),
     );
@@ -427,6 +597,32 @@ class _EmptyState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AddPathTile extends StatelessWidget {
+  const _AddPathTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(radius: 20, child: Icon(icon, size: 20)),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }
