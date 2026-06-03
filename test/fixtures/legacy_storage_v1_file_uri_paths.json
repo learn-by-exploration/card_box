@@ -1,0 +1,12 @@
+[
+  {
+    "id": "legacy-photo-storage-1",
+    "name": "Legacy photo storage card",
+    "issuer": "Fixture issuer",
+    "category": "id",
+    "frontImagePath": "file:///data/user/0/com.cardbox.card_box/app_flutter/card_images/front_fixture.jpg",
+    "backImagePath": "file:///data/user/0/com.cardbox.card_box/app_flutter/card_images/back_fixture.jpg",
+    "createdAt": "2026-06-03T00:00:00.000",
+    "updatedAt": "2026-06-03T00:00:00.000"
+  }
+]

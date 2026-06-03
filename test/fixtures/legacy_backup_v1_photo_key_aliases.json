@@ -1,0 +1,16 @@
+{
+  "format": "card_box_plain_json",
+  "version": 1,
+  "cards": [
+    {
+      "id": "legacy-photo-backup-1",
+      "name": "Legacy photo backup card",
+      "issuer": "Fixture issuer",
+      "category": "membership",
+      "frontPhotoPath": "file:///storage/emulated/0/Android/data/com.cardbox.card_box/files/card_images/legacy_front.jpg",
+      "backPhotoPath": "file:///storage/emulated/0/Android/data/com.cardbox.card_box/files/card_images/legacy_back.jpg",
+      "createdAt": "2026-06-03T00:00:00.000",
+      "updatedAt": "2026-06-03T00:00:00.000"
+    }
+  ]
+}
