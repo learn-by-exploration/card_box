@@ -260,6 +260,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               _AddPathTile(
+                icon: Icons.contact_page_outlined,
+                title: 'Visiting card',
+                subtitle:
+                    'Scan a business card and review extracted contact details',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openAddCard(AddCardPreset.visiting);
+                },
+              ),
+              _AddPathTile(
                 icon: Icons.add_card,
                 title: 'General card',
                 subtitle: 'Start blank and decide the details yourself',
@@ -313,8 +323,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit card'),
-                subtitle: const Text('Update details, photos, notes, or codes'),
+                title: Text(card.isVisitingCard ? 'Edit contact' : 'Edit card'),
+                subtitle: Text(
+                  card.isVisitingCard
+                      ? 'Update photos, extracted fields, and notes'
+                      : 'Update details, photos, notes, or codes',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   Navigator.of(this.context).push(
@@ -331,8 +345,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.visibility_outlined),
-                title: const Text('View details'),
-                subtitle: const Text('Open the full card detail screen'),
+                title: Text(
+                  card.isVisitingCard ? 'View contact' : 'View details',
+                ),
+                subtitle: Text(
+                  card.isVisitingCard
+                      ? 'Open the full contact detail screen'
+                      : 'Open the full card detail screen',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   Navigator.of(this.context).push(
@@ -346,7 +366,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              if (!card.hasBarcode)
+              if (!card.hasBarcode && !card.isVisitingCard)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.nfc),
@@ -428,6 +448,11 @@ class _HomeScreenState extends State<HomeScreen> {
             card.categoryLabel,
             card.notes,
             card.barcodePayload,
+            card.contactTitle,
+            card.contactAddress,
+            ...card.contactPhones,
+            ...card.contactEmails,
+            ...card.contactWebsites,
           ].any((value) => value.toLowerCase().contains(normalizedQuery));
       return categoryMatches && statusMatches && queryMatches;
     }).toList();

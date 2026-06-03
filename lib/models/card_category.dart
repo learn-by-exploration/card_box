@@ -6,6 +6,7 @@ enum CardCategory {
   gift('Gift'),
   id('ID'),
   library('Library'),
+  contact('Contact'),
   other('Other');
 
   const CardCategory(this.label);

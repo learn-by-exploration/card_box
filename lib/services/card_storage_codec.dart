@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:card_box/models/wallet_card.dart';
 
 class CardStorageCodec {
-  static const currentSchemaVersion = 2;
+  static const currentSchemaVersion = 3;
   static const storageFormat = 'card_box_storage';
   static const backupFormat = 'card_box_plain_json';
 
@@ -115,6 +115,7 @@ class CardStorageCodec {
     for (var version = fromVersion; version < currentSchemaVersion; version++) {
       cardMaps = switch (version) {
         1 => cardMaps.map(_migrateCardV1toV2).toList(),
+        2 => cardMaps.map(_migrateCardV2toV3).toList(),
         _ => cardMaps,
       };
     }
@@ -163,6 +164,28 @@ class CardStorageCodec {
     };
   }
 
+  Map<String, Object?> _migrateCardV2toV3(Map<String, Object?> source) {
+    final migrated = Map<String, Object?>.from(source);
+    migrated['cardType'] = _nonEmptyString(migrated['cardType']) ?? 'standard';
+    migrated['rawOcrText'] = _nonEmptyString(migrated['rawOcrText']) ?? '';
+    migrated['contactTitle'] = _nonEmptyString(migrated['contactTitle']) ?? '';
+    migrated['contactPhones'] = _normalizeStringList(
+      migrated['contactPhones'],
+      fallback: _splitLegacyLines(migrated['contactPhone']),
+    );
+    migrated['contactEmails'] = _normalizeStringList(
+      migrated['contactEmails'],
+      fallback: _splitLegacyLines(migrated['contactEmail']),
+    );
+    migrated['contactWebsites'] = _normalizeStringList(
+      migrated['contactWebsites'],
+      fallback: _splitLegacyLines(migrated['contactWebsite']),
+    );
+    migrated['contactAddress'] =
+        _nonEmptyString(migrated['contactAddress']) ?? '';
+    return migrated;
+  }
+
   String? _nonEmptyString(Object? value) {
     if (value is! String) {
       return null;
@@ -177,6 +200,28 @@ class CardStorageCodec {
       return trimmed.substring('file://'.length);
     }
     return trimmed;
+  }
+
+  List<String> _normalizeStringList(Object? value, {List<String>? fallback}) {
+    if (value is List) {
+      return value
+          .whereType<String>()
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return fallback ?? const <String>[];
+  }
+
+  List<String> _splitLegacyLines(Object? value) {
+    if (value is! String) {
+      return const <String>[];
+    }
+    return value
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
   }
 
   List<BackupImagePayload> _decodeImageAttachments(Object? value) {

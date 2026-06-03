@@ -70,7 +70,11 @@ class CardTile extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          card.hasBarcode ? 'Tap for code' : 'Tap for actions',
+                          card.hasBarcode
+                              ? 'Tap for code'
+                              : card.isVisitingCard
+                              ? 'Tap for contact'
+                              : 'Tap for actions',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -82,6 +86,8 @@ class CardTile extends StatelessWidget {
               Icon(
                 card.hasBarcode
                     ? Icons.qr_code_scanner_outlined
+                    : card.isVisitingCard
+                    ? Icons.contact_phone_outlined
                     : Icons.more_horiz,
               ),
             ],
@@ -92,6 +98,9 @@ class CardTile extends StatelessWidget {
   }
 
   IconData _iconForCard() {
+    if (card.isVisitingCard) {
+      return Icons.contact_page_outlined;
+    }
     if (card.hasBarcode) {
       return Icons.qr_code_2;
     }

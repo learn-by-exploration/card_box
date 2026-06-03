@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:card_box/main.dart';
 import 'package:card_box/models/card_category.dart';
-import 'package:card_box/models/compatibility_status.dart';
+import 'package:card_box/models/card_type.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_crypto_service.dart';
@@ -17,18 +17,23 @@ import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/card_storage_codec.dart';
 import 'package:card_box/services/device_auth_service.dart';
 import 'package:card_box/services/secure_store.dart';
+import 'package:card_box/services/vcard_export_service.dart';
 
 void main() {
   test('WalletCard round-trips through JSON', () {
     final now = DateTime(2026, 6, 3);
     final card = WalletCard(
       id: 'card-1',
-      name: 'Library card',
-      issuer: 'Public library',
-      category: CardCategory.library,
-      barcodePayload: 'LIB-001',
-      barcodeFormat: 'Code 39',
-      compatibilityStatus: CompatibilityStatus.barcodeDisplayable,
+      name: 'Aiko Tanaka',
+      issuer: 'CourtSide Japan',
+      category: CardCategory.contact,
+      cardType: CardType.visitingCard,
+      rawOcrText: 'Aiko Tanaka\nCourtSide Japan\naiko@example.com',
+      contactTitle: 'Community Manager',
+      contactPhones: const ['+81 90 1111 2222'],
+      contactEmails: const ['aiko@example.com'],
+      contactWebsites: const ['courtside.jp'],
+      contactAddress: 'Tokyo, Japan',
       createdAt: now,
       updatedAt: now,
     );
@@ -36,12 +41,11 @@ void main() {
     final restored = WalletCard.fromJson(card.toJson());
 
     expect(restored.id, 'card-1');
-    expect(restored.category, CardCategory.library);
-    expect(
-      restored.compatibilityStatus,
-      CompatibilityStatus.barcodeDisplayable,
-    );
-    expect(restored.barcodePayload, 'LIB-001');
+    expect(restored.category, CardCategory.contact);
+    expect(restored.cardType, CardType.visitingCard);
+    expect(restored.contactTitle, 'Community Manager');
+    expect(restored.contactPhones, ['+81 90 1111 2222']);
+    expect(restored.contactEmails, ['aiko@example.com']);
   });
 
   test('CardRepository exports and imports plain JSON', () async {
@@ -107,6 +111,62 @@ void main() {
     expect(restored, isNotNull);
     expect(restored!.frontImagePath, startsWith('/imported/photo-card_front'));
     expect(secondMediaManager.importedPaths, hasLength(1));
+  });
+
+  test('Visiting card keeps images through save and backup import', () async {
+    SharedPreferences.setMockInitialValues({});
+    final mediaManager = _FakeCardMediaManager();
+    mediaManager.seedImage(
+      '/images/visit_front.jpg',
+      StoredImageBackupData(
+        bytes: Uint8List.fromList([10, 20, 30]),
+        extension: '.jpg',
+      ),
+    );
+    mediaManager.seedImage(
+      '/images/visit_back.jpg',
+      StoredImageBackupData(
+        bytes: Uint8List.fromList([40, 50, 60]),
+        extension: '.jpg',
+      ),
+    );
+    final repository = CardRepository(mediaManager: mediaManager);
+    await repository.init();
+    await repository.upsert(
+      WalletCard(
+        id: 'visiting-1',
+        name: 'Aiko Tanaka',
+        issuer: 'CourtSide Japan',
+        category: CardCategory.contact,
+        cardType: CardType.visitingCard,
+        frontImagePath: '/images/visit_front.jpg',
+        backImagePath: '/images/visit_back.jpg',
+        rawOcrText: 'Aiko Tanaka\nCourtSide Japan',
+        contactTitle: 'Community Manager',
+        createdAt: DateTime(2026, 6, 3),
+        updatedAt: DateTime(2026, 6, 3),
+      ),
+    );
+
+    final saved = repository.findById('visiting-1');
+    expect(saved, isNotNull);
+    expect(saved!.frontImagePath, '/images/visit_front.jpg');
+    expect(saved.backImagePath, '/images/visit_back.jpg');
+
+    final exported = await repository.exportPlainJson();
+
+    SharedPreferences.setMockInitialValues({});
+    final secondMediaManager = _FakeCardMediaManager();
+    final secondRepository = CardRepository(mediaManager: secondMediaManager);
+    await secondRepository.init();
+    await secondRepository.importPlainJson(exported);
+
+    final restored = secondRepository.findById('visiting-1');
+    expect(restored, isNotNull);
+    expect(restored!.cardType, CardType.visitingCard);
+    expect(restored.frontImagePath, startsWith('/imported/visiting-1_front'));
+    expect(restored.backImagePath, startsWith('/imported/visiting-1_back'));
+    expect(secondMediaManager.importedPaths, hasLength(2));
   });
 
   test('CardRepository migrates legacy on-device storage on init', () async {
@@ -182,6 +242,64 @@ void main() {
       repository.cards.any((card) => card.id == 'legacy-backup-1'),
       isTrue,
     );
+  });
+
+  test('CardStorageCodec migrates v2 cards to visiting-card aware schema', () {
+    final rawJson = jsonEncode({
+      'format': 'card_box_storage',
+      'schemaVersion': 2,
+      'cards': [
+        {
+          'id': 'legacy-v2-card',
+          'name': 'Contact card',
+          'issuer': 'Legacy Co',
+          'category': 'contact',
+          'contactPhone': '+1 555 123 4567',
+          'contactEmail': 'hello@legacy.example',
+          'contactWebsite': 'legacy.example',
+          'createdAt': '2026-06-03T00:00:00.000',
+          'updatedAt': '2026-06-03T00:00:00.000',
+        },
+      ],
+    });
+
+    final migrated = CardStorageCodec().decodeStored(rawJson);
+    final card = migrated.cards.single;
+
+    expect(migrated.schemaVersion, CardStorageCodec.currentSchemaVersion);
+    expect(card.cardType, CardType.standard);
+    expect(card.contactPhones, ['+1 555 123 4567']);
+    expect(card.contactEmails, ['hello@legacy.example']);
+    expect(card.contactWebsites, ['legacy.example']);
+  });
+
+  test('VCardExportService builds a useful visiting-card export', () {
+    const service = VCardExportService();
+    final card = WalletCard(
+      id: 'visit-1',
+      name: 'Aiko Tanaka',
+      issuer: 'CourtSide Japan',
+      category: CardCategory.contact,
+      cardType: CardType.visitingCard,
+      contactTitle: 'Community Manager',
+      contactPhones: const ['+81 90 1111 2222'],
+      contactEmails: const ['aiko@example.com'],
+      contactWebsites: const ['https://courtside.jp'],
+      contactAddress: 'Tokyo, Japan',
+      notes: 'Met at practice',
+      rawOcrText: 'Aiko Tanaka\nCourtSide Japan',
+      createdAt: DateTime(2026, 6, 3),
+      updatedAt: DateTime(2026, 6, 3),
+    );
+
+    final vcard = service.buildVCard(card);
+
+    expect(vcard, contains('BEGIN:VCARD'));
+    expect(vcard, contains('FN:Aiko Tanaka'));
+    expect(vcard, contains('ORG:CourtSide Japan'));
+    expect(vcard, contains('EMAIL;TYPE=INTERNET:aiko@example.com'));
+    expect(vcard, contains('URL:https://courtside.jp'));
+    expect(vcard, contains('END:VCARD'));
   });
 
   test('CardStorageCodec migrates legacy backup fixture photo key aliases', () {

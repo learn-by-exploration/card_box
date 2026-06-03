@@ -1,4 +1,5 @@
 import 'package:card_box/models/card_category.dart';
+import 'package:card_box/models/card_type.dart';
 import 'package:card_box/models/compatibility_status.dart';
 
 class WalletCard {
@@ -19,6 +20,13 @@ class WalletCard {
     this.barcodeFormat = '',
     this.nfcTagSummary = '',
     this.compatibilityStatus = CompatibilityStatus.untested,
+    this.cardType = CardType.standard,
+    this.rawOcrText = '',
+    this.contactTitle = '',
+    this.contactPhones = const <String>[],
+    this.contactEmails = const <String>[],
+    this.contactWebsites = const <String>[],
+    this.contactAddress = '',
     this.customCategory,
   });
 
@@ -37,6 +45,13 @@ class WalletCard {
   final String barcodeFormat;
   final String nfcTagSummary;
   final CompatibilityStatus compatibilityStatus;
+  final CardType cardType;
+  final String rawOcrText;
+  final String contactTitle;
+  final List<String> contactPhones;
+  final List<String> contactEmails;
+  final List<String> contactWebsites;
+  final String contactAddress;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -51,6 +66,15 @@ class WalletCard {
   bool get hasBarcode => barcodePayload.trim().isNotEmpty;
   bool get hasPhotos =>
       frontImagePath.trim().isNotEmpty || backImagePath.trim().isNotEmpty;
+  bool get isVisitingCard => cardType == CardType.visitingCard;
+  bool get hasContactDetails =>
+      isVisitingCard &&
+      (contactTitle.trim().isNotEmpty ||
+          contactPhones.isNotEmpty ||
+          contactEmails.isNotEmpty ||
+          contactWebsites.isNotEmpty ||
+          contactAddress.trim().isNotEmpty ||
+          rawOcrText.trim().isNotEmpty);
 
   WalletCard copyWith({
     String? id,
@@ -69,6 +93,13 @@ class WalletCard {
     String? barcodeFormat,
     String? nfcTagSummary,
     CompatibilityStatus? compatibilityStatus,
+    CardType? cardType,
+    String? rawOcrText,
+    String? contactTitle,
+    List<String>? contactPhones,
+    List<String>? contactEmails,
+    List<String>? contactWebsites,
+    String? contactAddress,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -88,6 +119,13 @@ class WalletCard {
       barcodeFormat: barcodeFormat ?? this.barcodeFormat,
       nfcTagSummary: nfcTagSummary ?? this.nfcTagSummary,
       compatibilityStatus: compatibilityStatus ?? this.compatibilityStatus,
+      cardType: cardType ?? this.cardType,
+      rawOcrText: rawOcrText ?? this.rawOcrText,
+      contactTitle: contactTitle ?? this.contactTitle,
+      contactPhones: contactPhones ?? this.contactPhones,
+      contactEmails: contactEmails ?? this.contactEmails,
+      contactWebsites: contactWebsites ?? this.contactWebsites,
+      contactAddress: contactAddress ?? this.contactAddress,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -110,6 +148,13 @@ class WalletCard {
       'barcodeFormat': barcodeFormat,
       'nfcTagSummary': nfcTagSummary,
       'compatibilityStatus': compatibilityStatus.name,
+      'cardType': cardType.name,
+      'rawOcrText': rawOcrText,
+      'contactTitle': contactTitle,
+      'contactPhones': contactPhones,
+      'contactEmails': contactEmails,
+      'contactWebsites': contactWebsites,
+      'contactAddress': contactAddress,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -134,6 +179,13 @@ class WalletCard {
       compatibilityStatus: CompatibilityStatus.fromName(
         json['compatibilityStatus'] as String? ?? '',
       ),
+      cardType: CardType.fromName(json['cardType'] as String? ?? ''),
+      rawOcrText: json['rawOcrText'] as String? ?? '',
+      contactTitle: json['contactTitle'] as String? ?? '',
+      contactPhones: _parseStringList(json['contactPhones']),
+      contactEmails: _parseStringList(json['contactEmails']),
+      contactWebsites: _parseStringList(json['contactWebsites']),
+      contactAddress: json['contactAddress'] as String? ?? '',
       createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updatedAt']) ?? DateTime.now(),
     );
@@ -144,5 +196,16 @@ class WalletCard {
       return null;
     }
     return DateTime.tryParse(value);
+  }
+
+  static List<String> _parseStringList(Object? value) {
+    if (value is! List) {
+      return const <String>[];
+    }
+    return value
+        .whereType<String>()
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
   }
 }

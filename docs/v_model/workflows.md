@@ -149,3 +149,50 @@ Main flow:
 Postconditions:
 
 - Card data is protected from casual access.
+
+## WF-008: Scan And Save A Visiting Card
+
+Preconditions:
+
+- User has a physical visiting card.
+- Camera/card scan path is available on the device.
+
+Main flow:
+
+1. User taps add card.
+2. User chooses the Visiting card path.
+3. App asks permission before opening the scan or camera interface.
+4. User scans the front of the visiting card.
+5. User optionally scans the back of the visiting card.
+6. App offers Extract details.
+7. App runs on-device OCR.
+8. App proposes candidate fields such as name, company, title, phone, email,
+   website, and address.
+9. User reviews each suggested field, accepts it, edits it, or removes it.
+10. User saves the visiting card record.
+
+Postconditions:
+
+- The original image is saved.
+- Raw OCR text is saved.
+- User-approved structured fields are saved.
+- The visiting card appears in the catalog.
+
+## WF-009: Re-Extract Visiting Card Details
+
+Preconditions:
+
+- A visiting card record already exists with saved image(s).
+
+Main flow:
+
+1. User opens the visiting card.
+2. User taps Extract details or Re-extract details.
+3. App reruns OCR on the saved image.
+4. App shows proposed fields again without silently overwriting saved values.
+5. User accepts selected changes and saves.
+
+Postconditions:
+
+- Structured fields are updated deliberately.
+- Existing user-entered values are not overwritten without review.

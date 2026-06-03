@@ -30,6 +30,12 @@ Status: v0.1 prototype started, updated 2026-06-03.
 - Barcode/QR rendering wired for supported formats.
 - Android-first NFC availability check and tag-summary scanning wired into the
   compatibility flow.
+- Visiting-card capture and OCR-assisted review flow:
+  - visiting-card add preset
+  - edge-scan/photo capture reuse
+  - on-device OCR extraction
+  - field-by-field review before save
+  - structured contact details plus raw OCR text storage
 - Biometric app lock with fallback app PIN, optional biometric unlock, and
   optional lock-on-resume settings.
 - Demo acceptance cards:
@@ -63,6 +69,8 @@ Status: v0.1 prototype started, updated 2026-06-03.
 - `nfc_manager` is vendored under `third_party/nfc_manager` and patched to use
   Flutter 3.44 built-in Kotlin support, removing the earlier KGP warning on
   Android builds.
+- iOS deployment target is raised to `15.5` to match the OCR package
+  requirement.
 
 ## Not Yet Built
 

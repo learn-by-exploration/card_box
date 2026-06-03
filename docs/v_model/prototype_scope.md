@@ -17,6 +17,7 @@ without hosted services and without payment-card support.
 | Capture Photos | Add front and back card images |
 | Barcode / QR Scan | Scan or manually enter barcode/QR payload |
 | Compatibility Test | Run guided checks and classify card behavior |
+| Visiting Card Review | Review OCR-extracted visiting-card details before save |
 | Export / Import | Save and restore user-controlled backups |
 | Settings | Theme, export, future app-lock entry point |
 
@@ -68,6 +69,19 @@ Draft fields:
 - `compatibilityStatus`
 - `createdAt`
 - `updatedAt`
+
+Additional visiting-card fields:
+
+- `cardType`
+- `rawOcrText`
+- `contactName`
+- `contactCompany`
+- `contactTitle`
+- `contactPhones`
+- `contactEmails`
+- `contactWebsites`
+- `contactAddress`
+- `contactNotes`
 
 ## Prototype Non-Goals
 

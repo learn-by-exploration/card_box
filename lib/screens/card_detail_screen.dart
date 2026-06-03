@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
+import 'package:card_box/screens/card_image_viewer_screen.dart';
 import 'package:card_box/screens/compatibility_test_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
+import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/vcard_export_service.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
@@ -145,6 +149,8 @@ class _ActionHeader extends StatelessWidget {
   final WalletCard card;
   final CardRepository repository;
   final AppLockService appLockService;
+  final BackupFileService _fileService = const BackupFileService();
+  final VCardExportService _vCardExportService = const VCardExportService();
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +171,18 @@ class _ActionHeader extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (card.isVisitingCard)
+                  FilledButton.icon(
+                    icon: const Icon(Icons.copy_all_outlined),
+                    label: const Text('Copy contact'),
+                    onPressed: () => _copyContactBlock(context),
+                  ),
+                if (card.isVisitingCard)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.perm_contact_calendar_outlined),
+                    label: const Text('Export vCard'),
+                    onPressed: () => _exportVCard(context),
+                  ),
                 if (card.hasBarcode)
                   FilledButton.icon(
                     icon: const Icon(Icons.fullscreen),
@@ -175,23 +193,24 @@ class _ActionHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.sensors),
-                  label: Text(
-                    card.compatibilityStatus == CompatibilityStatus.untested
-                        ? 'Test NFC/RFID'
-                        : 'Retest NFC/RFID',
-                  ),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => CompatibilityTestScreen(
-                        repository: repository,
-                        appLockService: appLockService,
-                        card: card,
+                if (!card.isVisitingCard)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.sensors),
+                    label: Text(
+                      card.compatibilityStatus == CompatibilityStatus.untested
+                          ? 'Test NFC/RFID'
+                          : 'Retest NFC/RFID',
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CompatibilityTestScreen(
+                          repository: repository,
+                          appLockService: appLockService,
+                          card: card,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ],
@@ -201,6 +220,9 @@ class _ActionHeader extends StatelessWidget {
   }
 
   String _summaryText() {
+    if (card.isVisitingCard) {
+      return 'This visiting card keeps the original scan and the contact details together. Open Edit any time to re-extract or refine the saved fields.';
+    }
     if (card.hasBarcode) {
       return 'This card is ready to be shown on screen, and you can still test NFC/RFID compatibility if needed.';
     }
@@ -215,6 +237,57 @@ class _ActionHeader extends StatelessWidget {
     }
     return 'Use compatibility testing to learn whether this phone can read anything useful from the card.';
   }
+
+  Future<void> _copyContactBlock(BuildContext context) async {
+    final lines = <String>[
+      card.name,
+      if (card.issuer.isNotEmpty) card.issuer,
+      if (card.contactTitle.isNotEmpty) card.contactTitle,
+      ...card.contactPhones,
+      ...card.contactEmails,
+      ...card.contactWebsites,
+      if (card.contactAddress.isNotEmpty) card.contactAddress,
+      if (card.notes.isNotEmpty) card.notes,
+    ];
+    await Clipboard.setData(ClipboardData(text: lines.join('\n')));
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Contact details copied')));
+    }
+  }
+
+  Future<void> _exportVCard(BuildContext context) async {
+    try {
+      appLockService.beginTrustedExternalFlow();
+      final fileInfo = await _fileService.createTextFile(
+        content: _vCardExportService.buildVCard(card),
+        fileNamePrefix: _vCardExportService.suggestedFileName(card),
+        extension: 'vcf',
+      );
+      if (!context.mounted) {
+        return;
+      }
+      if (fileInfo == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('vCard export canceled')));
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('vCard saved as ${fileInfo.fileName}')),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not export vCard: $error')));
+    } finally {
+      appLockService.endTrustedExternalFlow();
+    }
+  }
 }
 
 class _PhotoStrip extends StatelessWidget {
@@ -228,6 +301,7 @@ class _PhotoStrip extends StatelessWidget {
       children: [
         Expanded(
           child: _PhotoPlaceholder(
+            cardName: card.name,
             label: 'Front photo',
             value: card.frontImagePath,
           ),
@@ -235,6 +309,7 @@ class _PhotoStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _PhotoPlaceholder(
+            cardName: card.name,
             label: 'Back photo',
             value: card.backImagePath,
           ),
@@ -245,16 +320,70 @@ class _PhotoStrip extends StatelessWidget {
 }
 
 class _PhotoPlaceholder extends StatelessWidget {
-  const _PhotoPlaceholder({required this.label, required this.value});
+  const _PhotoPlaceholder({
+    required this.cardName,
+    required this.label,
+    required this.value,
+  });
 
+  final String cardName;
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1.6,
-      child: StoredCardImage(path: value, emptyLabel: label),
+    final canOpen = value.trim().isNotEmpty;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: canOpen
+          ? () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => CardImageViewerScreen(
+                  imagePath: value,
+                  title: '$cardName • $label',
+                ),
+              ),
+            )
+          : null,
+      child: AspectRatio(
+        aspectRatio: 1.6,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: StoredCardImage(path: value, emptyLabel: label),
+            ),
+            if (canOpen)
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.62),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.open_in_full, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'Open',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -366,16 +495,68 @@ class _InfoPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _InfoRow(label: 'Category', value: card.categoryLabel),
-            _InfoRow(
+            _buildInfoRow(
+              context,
               label: 'Issuer',
               value: card.issuer.isEmpty ? 'Not set' : card.issuer,
+              copyValue: card.issuer,
             ),
-            _InfoRow(
-              label: 'NFC summary',
-              value: card.nfcTagSummary.isEmpty
-                  ? 'Not tested'
-                  : card.nfcTagSummary,
-            ),
+            if (card.isVisitingCard) ...[
+              _buildInfoRow(
+                context,
+                label: 'Title',
+                value: card.contactTitle.isEmpty
+                    ? 'Not set'
+                    : card.contactTitle,
+                copyValue: card.contactTitle,
+              ),
+              _buildInfoRow(
+                context,
+                label: 'Phone numbers',
+                value: card.contactPhones.isEmpty
+                    ? 'Not set'
+                    : card.contactPhones.join('\n'),
+                copyValue: card.contactPhones.join('\n'),
+              ),
+              _buildInfoRow(
+                context,
+                label: 'Emails',
+                value: card.contactEmails.isEmpty
+                    ? 'Not set'
+                    : card.contactEmails.join('\n'),
+                copyValue: card.contactEmails.join('\n'),
+              ),
+              _buildInfoRow(
+                context,
+                label: 'Websites',
+                value: card.contactWebsites.isEmpty
+                    ? 'Not set'
+                    : card.contactWebsites.join('\n'),
+                copyValue: card.contactWebsites.join('\n'),
+              ),
+              _buildInfoRow(
+                context,
+                label: 'Address',
+                value: card.contactAddress.isEmpty
+                    ? 'Not set'
+                    : card.contactAddress,
+                copyValue: card.contactAddress,
+              ),
+              if (card.rawOcrText.isNotEmpty)
+                _buildInfoRow(
+                  context,
+                  label: 'Extracted text',
+                  value: card.rawOcrText,
+                  copyValue: card.rawOcrText,
+                ),
+            ] else ...[
+              _InfoRow(
+                label: 'NFC summary',
+                value: card.nfcTagSummary.isEmpty
+                    ? 'Not tested'
+                    : card.nfcTagSummary,
+              ),
+            ],
             _InfoRow(
               label: 'Notes',
               value: card.notes.isEmpty ? 'No notes' : card.notes,
@@ -383,6 +564,30 @@ class _InfoPanel extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required String copyValue,
+  }) {
+    final trimmedCopy = copyValue.trim();
+    if (trimmedCopy.isEmpty) {
+      return _InfoRow(label: label, value: value);
+    }
+    return _CopyableInfoRow(
+      label: label,
+      value: value,
+      onCopy: () async {
+        await Clipboard.setData(ClipboardData(text: trimmedCopy));
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$label copied')));
+        }
+      },
     );
   }
 }
@@ -403,6 +608,51 @@ class _InfoRow extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          Text(value),
+        ],
+      ),
+    );
+  }
+}
+
+class _CopyableInfoRow extends StatelessWidget {
+  const _CopyableInfoRow({
+    required this.label,
+    required this.value,
+    required this.onCopy,
+  });
+
+  final String label;
+  final String value;
+  final Future<void> Function() onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Copy $label',
+                onPressed: onCopy,
+                icon: const Icon(Icons.copy_rounded, size: 18),
+              ),
+            ],
           ),
           const SizedBox(height: 2),
           Text(value),

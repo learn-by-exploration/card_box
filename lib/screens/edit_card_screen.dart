@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 
 import 'package:card_box/models/add_card_preset.dart';
 import 'package:card_box/models/card_category.dart';
+import 'package:card_box/models/card_type.dart';
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/scanned_code.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/barcode_scan_screen.dart';
+import 'package:card_box/screens/card_image_viewer_screen.dart';
+import 'package:card_box/screens/visiting_card_review_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/card_media_service.dart';
+import 'package:card_box/services/visiting_card_ocr_service.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
 class EditCardScreen extends StatefulWidget {
@@ -38,17 +42,26 @@ class _EditCardScreenState extends State<EditCardScreen> {
   final _notesController = TextEditingController();
   final _barcodePayloadController = TextEditingController();
   final _barcodeFormatController = TextEditingController();
+  final _contactTitleController = TextEditingController();
+  final _contactPhonesController = TextEditingController();
+  final _contactEmailsController = TextEditingController();
+  final _contactWebsitesController = TextEditingController();
+  final _contactAddressController = TextEditingController();
   final _mediaService = CardMediaService();
   final _mediaManager = const DefaultCardMediaManager();
+  final _visitingCardOcrService = VisitingCardOcrService();
 
   CardCategory _category = CardCategory.loyalty;
+  CardType _cardType = CardType.standard;
   late String _draftCardId;
   String _frontImagePath = '';
   String _backImagePath = '';
   String _initialFrontImagePath = '';
   String _initialBackImagePath = '';
+  String _rawOcrText = '';
   bool _busyFrontCapture = false;
   bool _busyBackCapture = false;
+  bool _extractingDetails = false;
   bool _saved = false;
 
   @override
@@ -71,6 +84,13 @@ class _EditCardScreenState extends State<EditCardScreen> {
     _barcodePayloadController.text = card.barcodePayload;
     _barcodeFormatController.text = card.barcodeFormat;
     _category = card.category;
+    _cardType = card.cardType;
+    _contactTitleController.text = card.contactTitle;
+    _contactPhonesController.text = card.contactPhones.join('\n');
+    _contactEmailsController.text = card.contactEmails.join('\n');
+    _contactWebsitesController.text = card.contactWebsites.join('\n');
+    _contactAddressController.text = card.contactAddress;
+    _rawOcrText = card.rawOcrText;
   }
 
   @override
@@ -84,6 +104,11 @@ class _EditCardScreenState extends State<EditCardScreen> {
     _notesController.dispose();
     _barcodePayloadController.dispose();
     _barcodeFormatController.dispose();
+    _contactTitleController.dispose();
+    _contactPhonesController.dispose();
+    _contactEmailsController.dispose();
+    _contactWebsitesController.dispose();
+    _contactAddressController.dispose();
     super.dispose();
   }
 
@@ -91,7 +116,13 @@ class _EditCardScreenState extends State<EditCardScreen> {
   Widget build(BuildContext context) {
     final editing = widget.existingCard != null;
     return Scaffold(
-      appBar: AppBar(title: Text(editing ? 'Edit card' : 'Add card')),
+      appBar: AppBar(
+        title: Text(
+          _cardType == CardType.visitingCard
+              ? (editing ? 'Edit visiting card' : 'Add visiting card')
+              : (editing ? 'Edit card' : 'Add card'),
+        ),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -101,13 +132,17 @@ class _EditCardScreenState extends State<EditCardScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Card name',
+              decoration: InputDecoration(
+                labelText: _cardType == CardType.visitingCard
+                    ? 'Person name'
+                    : 'Card name',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Enter a card name';
+                  return _cardType == CardType.visitingCard
+                      ? 'Enter a person name'
+                      : 'Enter a card name';
                 }
                 return null;
               },
@@ -115,8 +150,10 @@ class _EditCardScreenState extends State<EditCardScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _issuerController,
-              decoration: const InputDecoration(
-                labelText: 'Issuer',
+              decoration: InputDecoration(
+                labelText: _cardType == CardType.visitingCard
+                    ? 'Company'
+                    : 'Issuer',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -185,6 +222,82 @@ class _EditCardScreenState extends State<EditCardScreen> {
                   ? null
                   : () => _clearPhoto(side: 'back'),
             ),
+            if (_cardType == CardType.visitingCard) ...[
+              const SizedBox(height: 18),
+              _PermissionNote(
+                icon: Icons.manage_search,
+                text:
+                    'Use Extract details after adding at least the front image. Card Box will suggest contact fields, and you decide what to keep.',
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: _canExtractDetails
+                      ? _extractVisitingCardDetails
+                      : null,
+                  icon: Icon(
+                    _extractingDetails
+                        ? Icons.hourglass_top
+                        : Icons.auto_awesome,
+                  ),
+                  label: Text(
+                    _extractingDetails ? 'Extracting...' : 'Extract details',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _contactTitleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _contactPhonesController,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Phone numbers',
+                  helperText: 'One phone number per line',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _contactEmailsController,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Emails',
+                  helperText: 'One email per line',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _contactWebsitesController,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Websites',
+                  helperText: 'One website per line',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _contactAddressController,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Address',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             _PermissionNote(
               icon: Icons.qr_code_scanner,
@@ -264,6 +377,13 @@ class _EditCardScreenState extends State<EditCardScreen> {
       barcodeFormat: _barcodeFormatController.text.trim(),
       compatibilityStatus: nextStatus,
       nfcTagSummary: existing?.nfcTagSummary ?? '',
+      cardType: _cardType,
+      rawOcrText: _rawOcrText,
+      contactTitle: _contactTitleController.text.trim(),
+      contactPhones: _splitLines(_contactPhonesController.text),
+      contactEmails: _splitLines(_contactEmailsController.text),
+      contactWebsites: _splitLines(_contactWebsitesController.text),
+      contactAddress: _contactAddressController.text.trim(),
       favorite: existing?.favorite ?? false,
       archived: existing?.archived ?? false,
       createdAt: existing?.createdAt ?? now,
@@ -273,6 +393,71 @@ class _EditCardScreenState extends State<EditCardScreen> {
     if (mounted) {
       _saved = true;
       Navigator.of(context).pop();
+    }
+  }
+
+  bool get _canExtractDetails =>
+      !_extractingDetails && _frontImagePath.trim().isNotEmpty;
+
+  Future<void> _extractVisitingCardDetails() async {
+    if (_frontImagePath.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add the front image first, then extract details.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _extractingDetails = true);
+    try {
+      final extraction = await _visitingCardOcrService.extractFromImages(
+        frontImagePath: _frontImagePath,
+        backImagePath: _backImagePath.trim().isEmpty ? null : _backImagePath,
+      );
+      if (!mounted) {
+        return;
+      }
+      final reviewed = await Navigator.of(context)
+          .push<VisitingCardReviewResult>(
+            MaterialPageRoute(
+              builder: (_) => VisitingCardReviewScreen(
+                extraction: extraction,
+                frontImagePath: _frontImagePath,
+                backImagePath: _backImagePath,
+                currentName: _nameController.text.trim(),
+                currentCompany: _issuerController.text.trim(),
+                currentTitle: _contactTitleController.text.trim(),
+                currentPhones: _splitLines(_contactPhonesController.text),
+                currentEmails: _splitLines(_contactEmailsController.text),
+                currentWebsites: _splitLines(_contactWebsitesController.text),
+                currentAddress: _contactAddressController.text.trim(),
+              ),
+            ),
+          );
+      if (reviewed == null || !mounted) {
+        return;
+      }
+      setState(() {
+        _nameController.text = reviewed.name;
+        _issuerController.text = reviewed.company;
+        _contactTitleController.text = reviewed.title;
+        _contactPhonesController.text = reviewed.phones.join('\n');
+        _contactEmailsController.text = reviewed.emails.join('\n');
+        _contactWebsitesController.text = reviewed.websites.join('\n');
+        _contactAddressController.text = reviewed.address;
+        _rawOcrText = reviewed.rawOcrText;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not extract details: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _extractingDetails = false);
+      }
     }
   }
 
@@ -517,20 +702,30 @@ class _EditCardScreenState extends State<EditCardScreen> {
   void _applyPreset() {
     switch (widget.preset) {
       case AddCardPreset.general:
+        _cardType = CardType.standard;
         _category = CardCategory.loyalty;
         return;
       case AddCardPreset.barcode:
+        _cardType = CardType.standard;
         _category = CardCategory.loyalty;
         return;
       case AddCardPreset.nfc:
+        _cardType = CardType.standard;
         _category = CardCategory.access;
         _notesController.text =
             'Use Compatibility test after saving to try NFC reading.';
         return;
       case AddCardPreset.reference:
+        _cardType = CardType.standard;
         _category = CardCategory.id;
         _notesController.text =
             'Reference card: save photos and notes even if the phone cannot read it.';
+        return;
+      case AddCardPreset.visiting:
+        _cardType = CardType.visitingCard;
+        _category = CardCategory.contact;
+        _notesController.text =
+            'Scan the card, extract likely contact details, and review them before saving.';
         return;
     }
   }
@@ -539,6 +734,9 @@ class _EditCardScreenState extends State<EditCardScreen> {
     required WalletCard? existing,
     required bool hasBarcode,
   }) {
+    if (_cardType == CardType.visitingCard) {
+      return CompatibilityStatus.referenceOnly;
+    }
     final existingStatus = existing?.compatibilityStatus;
     if (hasBarcode) {
       return switch (existingStatus) {
@@ -558,6 +756,14 @@ class _EditCardScreenState extends State<EditCardScreen> {
       return existingStatus;
     }
     return CompatibilityStatus.untested;
+  }
+
+  List<String> _splitLines(String value) {
+    return value
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
   }
 
   Future<void> _clearPhoto({required String side}) async {
@@ -680,6 +886,8 @@ class _AddFlowGuide extends StatelessWidget {
         return 'Best for access, transit, or other tap-style cards. Save the record first, then test NFC.';
       case AddCardPreset.reference:
         return 'Best when the phone may not read the card at all and you mainly want photos and notes.';
+      case AddCardPreset.visiting:
+        return 'Best for business cards and contact cards. Scan the card, extract details, then review what should be saved.';
     }
   }
 
@@ -687,6 +895,8 @@ class _AddFlowGuide extends StatelessWidget {
     return switch (preset) {
       AddCardPreset.nfc =>
         'Save the card, then open Compatibility test to try NFC reading for supported cards.',
+      AddCardPreset.visiting =>
+        'Run Extract details after scanning so you can review suggested contact fields before saving.',
       _ =>
         'Save the card when the important details are in place. You can test compatibility later if needed.',
     };
@@ -747,6 +957,7 @@ class _PhotoEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canOpen = imagePath.trim().isNotEmpty;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -755,11 +966,66 @@ class _PhotoEditor extends StatelessWidget {
           children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            AspectRatio(
-              aspectRatio: 1.6,
-              child: StoredCardImage(
-                path: imagePath,
-                emptyLabel: '$title not added',
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: canOpen
+                  ? () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CardImageViewerScreen(
+                          imagePath: imagePath,
+                          title: title,
+                        ),
+                      ),
+                    )
+                  : null,
+              child: AspectRatio(
+                aspectRatio: 1.6,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: StoredCardImage(
+                        path: imagePath,
+                        emptyLabel: '$title not added',
+                      ),
+                    ),
+                    if (canOpen)
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.62),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.open_in_full,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Open',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 10),

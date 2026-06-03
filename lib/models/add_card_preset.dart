@@ -1,1 +1,1 @@
-enum AddCardPreset { general, barcode, nfc, reference }
+enum AddCardPreset { general, barcode, nfc, reference, visiting }

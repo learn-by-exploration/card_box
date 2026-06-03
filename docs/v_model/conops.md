@@ -11,9 +11,9 @@ also tells users when a card can only be stored as a reference.
 ## Operational Context
 
 Users may carry loyalty cards, membership cards, ID reference cards, library
-cards, gift cards, event passes, office/access cards, transit cards, and other
-RFID/NFC/barcode cards. Card Box runs as a local-first mobile app with no hosted
-backend.
+cards, gift cards, event passes, office/access cards, transit cards, visiting
+cards, and other RFID/NFC/barcode cards. Card Box runs as a local-first mobile
+app with no hosted backend.
 
 The app must work in ordinary day-to-day environments:
 
@@ -21,6 +21,8 @@ The app must work in ordinary day-to-day environments:
 - At home while cataloging many physical cards.
 - At an office or building entrance while checking whether an access card is
   phone-compatible.
+- After meeting someone and wanting to save a visiting card without retyping
+  contact details by hand.
 - While preparing for travel or cleanup by exporting a backup file.
 
 ## Actors
@@ -39,6 +41,7 @@ The app must work in ordinary day-to-day environments:
 | Catalog mode | Add, edit, search, favorite, archive, and view card records |
 | Presentation mode | Show barcode/QR or card image clearly for external scanning |
 | Compatibility test mode | Determine whether the card is barcode/QR displayable, NFC readable, Android HCE candidate, reference-only, or unsupported |
+| Contact extraction mode | Capture a visiting card, extract candidate fields, and let the user review them before save |
 | Export/import mode | Let the user create and restore local backup files |
 | Future secure mode | Protect app entry or sensitive cards with biometric/passcode lock |
 
@@ -55,10 +58,13 @@ new real-world card types without redesigning the card model.
 3. User captures front and back photos.
 4. User scans visible barcode/QR if present.
 5. User grants permission before camera/NFC/file interfaces are used.
-6. User runs compatibility test if the card has NFC/RFID behavior.
-7. App stores the card locally and labels its digital capability.
-8. Later, user searches for the card.
-9. User presents the barcode/QR, references the photo, or sees that the card
+6. If the card is a visiting card, the user runs extraction and reviews
+   candidate contact fields.
+7. User runs compatibility test if the card has NFC/RFID behavior.
+8. App stores the card locally and labels its digital capability.
+9. Later, user searches for the card.
+10. User presents the barcode/QR, references the photo, opens structured
+   contact details, or sees that the card
    remains physical-only.
 
 ## Constraints
