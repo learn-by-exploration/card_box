@@ -43,6 +43,19 @@ class VisitingCardOcrService {
     'owner',
     'representative',
     'supervisor',
+    '代表取締役',
+    '取締役',
+    '社長',
+    '部長',
+    '課長',
+    '主任',
+    '係長',
+    'マネージャー',
+    'ディレクター',
+    'コーチ',
+    '先生',
+    '教授',
+    '監督',
   ];
   static final _companyKeywords = <String>[
     'inc',
@@ -83,76 +96,115 @@ class VisitingCardOcrService {
     'tokyo',
     'osaka',
     'japan',
+    '丁目',
+    '番地',
+    '号',
+    '都',
+    '道',
+    '府',
+    '県',
+    '市',
+    '区',
+    '町',
+    '村',
+    'ビル',
   ];
 
   Future<VisitingCardExtraction> extractFromImages({
     required String frontImagePath,
     String? backImagePath,
   }) async {
-    final textRecognizer = TextRecognizer();
+    final recognizers = <TextRecognizer>[
+      TextRecognizer(script: TextRecognitionScript.latin),
+      TextRecognizer(script: TextRecognitionScript.japanese),
+    ];
     try {
-      final allLines = <String>[
-        ...await _recognizeLines(textRecognizer, frontImagePath),
-      ];
-      if (backImagePath != null && backImagePath.trim().isNotEmpty) {
-        allLines.addAll(await _recognizeLines(textRecognizer, backImagePath));
+      final allLines = <String>[];
+      for (final recognizer in recognizers) {
+        allLines.addAll(
+          await _recognizeLinesSafely(recognizer, frontImagePath),
+        );
       }
-
-      final normalizedLines = _dedupeLines(allLines);
-      final rawOcrText = normalizedLines.join('\n');
-      final emails = _dedupeMatches(_emailPattern, rawOcrText);
-      final websites = _dedupeMatches(
-        _websitePattern,
-        rawOcrText,
-      ).where((website) => !_looksLikeEmail(website)).toList();
-      final phones = _dedupeMatches(
-        _phonePattern,
-        rawOcrText,
-      ).where(_looksLikePhone).toList();
-
-      final remainingLines = normalizedLines.where((line) {
-        final lower = line.toLowerCase();
-        if (_emailPattern.hasMatch(line) ||
-            _websitePattern.hasMatch(line) ||
-            _phonePattern.hasMatch(line)) {
-          return false;
+      if (backImagePath != null && backImagePath.trim().isNotEmpty) {
+        for (final recognizer in recognizers) {
+          allLines.addAll(
+            await _recognizeLinesSafely(recognizer, backImagePath),
+          );
         }
-        if (lower.startsWith('tel') ||
-            lower.startsWith('fax') ||
-            lower.startsWith('mobile') ||
-            lower.startsWith('email') ||
-            lower.startsWith('web')) {
-          return false;
-        }
-        return true;
-      }).toList();
-
-      final suggestedName = _inferName(remainingLines);
-      final suggestedCompany = _inferCompany(remainingLines, suggestedName);
-      final suggestedTitle = _inferTitle(
-        remainingLines,
-        suggestedName,
-        suggestedCompany,
-      );
-      final suggestedAddress = _inferAddress(
-        remainingLines,
-        suggestedName,
-        suggestedCompany,
-        suggestedTitle,
-      );
-
-      return VisitingCardExtraction(
-        suggestedName: suggestedName,
-        suggestedCompany: suggestedCompany,
-        suggestedTitle: suggestedTitle,
-        suggestedPhones: phones,
-        suggestedEmails: emails,
-        suggestedWebsites: websites,
-        suggestedAddress: suggestedAddress,
-        rawOcrText: rawOcrText,
-      );
+      }
+      return parseRecognizedLines(allLines);
     } finally {
-      await textRecognizer.close();
+      for (final recognizer in recognizers) {
+        await recognizer.close();
+      }
+    }
+  }
+
+  VisitingCardExtraction parseRecognizedLines(List<String> rawLines) {
+    final normalizedLines = _dedupeLines(rawLines);
+    final rawOcrText = normalizedLines.join('\n');
+    final emails = _dedupeMatches(_emailPattern, rawOcrText);
+    final websites = _dedupeMatches(
+      _websitePattern,
+      rawOcrText,
+    ).where((website) => !_looksLikeEmail(website)).toList();
+    final phones = _extractPhones(normalizedLines);
+
+    final remainingLines = normalizedLines.where((line) {
+      final lower = line.toLowerCase();
+      if (_emailPattern.hasMatch(line) || _websitePattern.hasMatch(line)) {
+        return false;
+      }
+      if (_phonePattern.hasMatch(line) && !_looksLikeLikelyAddress(line)) {
+        return false;
+      }
+      if (lower.startsWith('tel') ||
+          lower.startsWith('fax') ||
+          lower.startsWith('mobile') ||
+          lower.startsWith('email') ||
+          lower.startsWith('web') ||
+          lower.startsWith('電話') ||
+          lower.startsWith('携帯') ||
+          lower.startsWith('mail')) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    final suggestedName = _inferName(remainingLines);
+    final suggestedCompany = _inferCompany(remainingLines, suggestedName);
+    final suggestedTitle = _inferTitle(
+      remainingLines,
+      suggestedName,
+      suggestedCompany,
+    );
+    final suggestedAddress = _inferAddress(
+      remainingLines,
+      suggestedName,
+      suggestedCompany,
+      suggestedTitle,
+    );
+
+    return VisitingCardExtraction(
+      suggestedName: suggestedName,
+      suggestedCompany: suggestedCompany,
+      suggestedTitle: suggestedTitle,
+      suggestedPhones: phones,
+      suggestedEmails: emails,
+      suggestedWebsites: websites,
+      suggestedAddress: suggestedAddress,
+      rawOcrText: rawOcrText,
+    );
+  }
+
+  Future<List<String>> _recognizeLinesSafely(
+    TextRecognizer recognizer,
+    String imagePath,
+  ) async {
+    try {
+      return await _recognizeLines(recognizer, imagePath);
+    } catch (_) {
+      return const <String>[];
     }
   }
 
@@ -196,7 +248,21 @@ class VisitingCardOcrService {
 
   bool _looksLikePhone(String value) {
     final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
-    return digitsOnly.length >= 7;
+    return digitsOnly.length >= 9;
+  }
+
+  List<String> _extractPhones(List<String> lines) {
+    final seen = <String>{};
+    for (final line in lines) {
+      for (final match in _phonePattern.allMatches(line)) {
+        final value = match.group(0)?.trim();
+        if (value == null || value.isEmpty || !_looksLikePhone(value)) {
+          continue;
+        }
+        seen.add(value);
+      }
+    }
+    return seen.toList();
   }
 
   String _inferName(List<String> lines) {
@@ -230,6 +296,11 @@ class VisitingCardOcrService {
     }
     for (final line in lines.take(8)) {
       if (line == suggestedName) {
+        continue;
+      }
+      final lower = line.toLowerCase();
+      if (_jobTitleKeywords.any(lower.contains) ||
+          _looksLikeLikelyAddress(line)) {
         continue;
       }
       if (!RegExp(r'\d').hasMatch(line) && line.length > 4) {
@@ -278,12 +349,27 @@ class VisitingCardOcrService {
       }
       final lower = line.toLowerCase();
       if (_addressKeywords.any(lower.contains) ||
+          _looksLikeLikelyAddress(line) ||
           (RegExp(r'\d').hasMatch(line) &&
               !lower.contains('fax') &&
-              !lower.contains('tel'))) {
+              !lower.contains('tel') &&
+              !lower.contains('phone'))) {
         addressLines.add(line);
       }
     }
     return addressLines.join('\n').trim();
+  }
+
+  bool _looksLikeLikelyAddress(String line) {
+    final lower = line.toLowerCase();
+    if (_addressKeywords.any(lower.contains)) {
+      return true;
+    }
+    return line.contains('〒') ||
+        line.contains('東京都') ||
+        line.contains('大阪府') ||
+        line.contains('京都府') ||
+        line.contains('北海道') ||
+        RegExp(r'\d{3}-\d{4}').hasMatch(line);
   }
 }

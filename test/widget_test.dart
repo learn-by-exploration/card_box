@@ -15,9 +15,11 @@ import 'package:card_box/services/backup_crypto_service.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/card_storage_codec.dart';
+import 'package:card_box/services/contact_action_service.dart';
 import 'package:card_box/services/device_auth_service.dart';
 import 'package:card_box/services/secure_store.dart';
 import 'package:card_box/services/vcard_export_service.dart';
+import 'package:card_box/services/visiting_card_ocr_service.dart';
 
 void main() {
   test('WalletCard round-trips through JSON', () {
@@ -300,6 +302,49 @@ void main() {
     expect(vcard, contains('EMAIL;TYPE=INTERNET:aiko@example.com'));
     expect(vcard, contains('URL:https://courtside.jp'));
     expect(vcard, contains('END:VCARD'));
+  });
+
+  test('ContactActionService builds launchable URIs', () {
+    const service = ContactActionService();
+
+    expect(
+      service.phoneUri('+81 90 1111 2222')?.toString(),
+      'tel:+81%2090%201111%202222',
+    );
+    expect(
+      service.emailUri('aiko@example.com')?.toString(),
+      'mailto:aiko@example.com',
+    );
+    expect(
+      service.websiteUri('courtside.jp')?.toString(),
+      'https://courtside.jp',
+    );
+    expect(
+      service.websiteUri('https://courtside.jp/profile')?.toString(),
+      'https://courtside.jp/profile',
+    );
+  });
+
+  test('VisitingCardOcrService parses Japanese business-card lines', () {
+    final service = VisitingCardOcrService();
+
+    final extraction = service.parseRecognizedLines([
+      '株式会社コートサイド',
+      '田中愛子',
+      'コミュニティマネージャー',
+      '〒150-0001 東京都渋谷区神宮前1-2-3',
+      '090-1111-2222',
+      'aiko@courtside.jp',
+      'https://courtside.jp',
+    ]);
+
+    expect(extraction.suggestedCompany, '株式会社コートサイド');
+    expect(extraction.suggestedName, '田中愛子');
+    expect(extraction.suggestedTitle, 'コミュニティマネージャー');
+    expect(extraction.suggestedPhones, contains('090-1111-2222'));
+    expect(extraction.suggestedEmails, contains('aiko@courtside.jp'));
+    expect(extraction.suggestedWebsites, contains('https://courtside.jp'));
+    expect(extraction.suggestedAddress, contains('東京都渋谷区'));
   });
 
   test('CardStorageCodec migrates legacy backup fixture photo key aliases', () {

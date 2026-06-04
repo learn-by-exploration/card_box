@@ -167,7 +167,16 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   Future<void> _scanNfc() async {
     if (_availability == NfcAvailability.disabled) {
       await _openNfcSettings();
-      await _loadAvailability();
+      if (!mounted) {
+        return;
+      }
+      if (_availability == NfcAvailability.enabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('NFC is on now. Tap Scan NFC card to continue.'),
+          ),
+        );
+      }
       return;
     }
     final approved = await _confirmInterfaceUse();
@@ -225,9 +234,13 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
 
   Future<void> _openNfcSettings() async {
     try {
+      widget.appLockService.beginTrustedExternalFlow();
       await AppSettings.openAppSettingsPanel(AppSettingsPanelType.nfc);
     } catch (_) {
       await AppSettings.openAppSettings(type: AppSettingsType.nfc);
+    } finally {
+      widget.appLockService.endTrustedExternalFlow();
+      await _loadAvailability();
     }
   }
 }

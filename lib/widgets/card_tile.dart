@@ -111,6 +111,9 @@ class CardTile extends StatelessWidget {
   }
 
   String _statusLabel() {
+    if (card.isVisitingCard) {
+      return 'Contact saved';
+    }
     return switch (card.compatibilityStatus) {
       CompatibilityStatus.barcodeDisplayable => 'Ready to show',
       CompatibilityStatus.nfcReadable => 'NFC readable',
@@ -123,6 +126,9 @@ class CardTile extends StatelessWidget {
   }
 
   Color _statusBackground(ColorScheme colors) {
+    if (card.isVisitingCard) {
+      return const Color(0xFFE7F6F1);
+    }
     return switch (card.compatibilityStatus) {
       CompatibilityStatus.barcodeDisplayable => const Color(0xFFE8F5E9),
       CompatibilityStatus.nfcReadable => const Color(0xFFE4F2FF),
@@ -135,6 +141,9 @@ class CardTile extends StatelessWidget {
   }
 
   Color _statusForeground(ColorScheme colors) {
+    if (card.isVisitingCard) {
+      return const Color(0xFF0D5C4A);
+    }
     return switch (card.compatibilityStatus) {
       CompatibilityStatus.barcodeDisplayable => const Color(0xFF1B5E20),
       CompatibilityStatus.nfcReadable => const Color(0xFF0D47A1),

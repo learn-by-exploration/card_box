@@ -34,8 +34,11 @@ Status: v0.1 prototype started, updated 2026-06-03.
   - visiting-card add preset
   - edge-scan/photo capture reuse
   - on-device OCR extraction
+  - Latin and Japanese OCR passes for better meishi/business-card parsing
   - field-by-field review before save
   - structured contact details plus raw OCR text storage
+  - quick actions for call, email, and website
+  - vCard export
 - Biometric app lock with fallback app PIN, optional biometric unlock, and
   optional lock-on-resume settings.
 - Demo acceptance cards:
@@ -59,6 +62,8 @@ Status: v0.1 prototype started, updated 2026-06-03.
 - `flutter analyze`
 - `flutter test`
 - `flutter build apk --debug`
+- `flutter build apk --release`
+- `flutter build appbundle --release`
 
 ## Build Notes
 
@@ -71,6 +76,8 @@ Status: v0.1 prototype started, updated 2026-06-03.
   Android builds.
 - iOS deployment target is raised to `15.5` to match the OCR package
   requirement.
+- iOS Podfile now includes the Japanese ML Kit text-recognition package for the
+  visiting-card OCR path.
 
 ## Not Yet Built
 

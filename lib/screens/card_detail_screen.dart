@@ -10,6 +10,7 @@ import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/contact_action_service.dart';
 import 'package:card_box/services/vcard_export_service.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
@@ -150,6 +151,8 @@ class _ActionHeader extends StatelessWidget {
   final CardRepository repository;
   final AppLockService appLockService;
   final BackupFileService _fileService = const BackupFileService();
+  final ContactActionService _contactActionService =
+      const ContactActionService();
   final VCardExportService _vCardExportService = const VCardExportService();
 
   @override
@@ -176,6 +179,43 @@ class _ActionHeader extends StatelessWidget {
                     icon: const Icon(Icons.copy_all_outlined),
                     label: const Text('Copy contact'),
                     onPressed: () => _copyContactBlock(context),
+                  ),
+                if (card.isVisitingCard && card.contactPhones.isNotEmpty)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.call_outlined),
+                    label: const Text('Call'),
+                    onPressed: () => _launchContactValue(
+                      context,
+                      title: 'Choose phone number',
+                      values: card.contactPhones,
+                      uriBuilder: _contactActionService.phoneUri,
+                      unsupportedMessage: 'This phone number cannot be opened.',
+                    ),
+                  ),
+                if (card.isVisitingCard && card.contactEmails.isNotEmpty)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.email_outlined),
+                    label: const Text('Email'),
+                    onPressed: () => _launchContactValue(
+                      context,
+                      title: 'Choose email address',
+                      values: card.contactEmails,
+                      uriBuilder: _contactActionService.emailUri,
+                      unsupportedMessage:
+                          'This email address cannot be opened.',
+                    ),
+                  ),
+                if (card.isVisitingCard && card.contactWebsites.isNotEmpty)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.language_outlined),
+                    label: const Text('Website'),
+                    onPressed: () => _launchContactValue(
+                      context,
+                      title: 'Choose website',
+                      values: card.contactWebsites,
+                      uriBuilder: _contactActionService.websiteUri,
+                      unsupportedMessage: 'This website cannot be opened.',
+                    ),
                   ),
                 if (card.isVisitingCard)
                   OutlinedButton.icon(
@@ -288,6 +328,87 @@ class _ActionHeader extends StatelessWidget {
       appLockService.endTrustedExternalFlow();
     }
   }
+
+  Future<void> _launchContactValue(
+    BuildContext context, {
+    required String title,
+    required List<String> values,
+    required Uri? Function(String value) uriBuilder,
+    required String unsupportedMessage,
+  }) async {
+    final selected = await _pickContactValue(
+      context,
+      title: title,
+      values: values,
+    );
+    if (selected == null || !context.mounted) {
+      return;
+    }
+    final uri = uriBuilder(selected);
+    if (uri == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(unsupportedMessage)));
+      return;
+    }
+    try {
+      appLockService.beginTrustedExternalFlow();
+      final opened = await _contactActionService.open(uri);
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(unsupportedMessage)));
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open link: $error')));
+      }
+    } finally {
+      appLockService.endTrustedExternalFlow();
+    }
+  }
+
+  Future<String?> _pickContactValue(
+    BuildContext context, {
+    required String title,
+    required List<String> values,
+  }) async {
+    final cleanValues = values
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+    if (cleanValues.isEmpty) {
+      return null;
+    }
+    if (cleanValues.length == 1) {
+      return cleanValues.first;
+    }
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              for (final value in cleanValues)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(value),
+                  onTap: () => Navigator.of(sheetContext).pop(value),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _PhotoStrip extends StatelessWidget {
@@ -397,6 +518,10 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = card.compatibilityStatus;
     final colors = Theme.of(context).colorScheme;
+    final label = card.isVisitingCard ? 'Contact saved' : status.label;
+    final description = card.isVisitingCard
+        ? 'This visiting card is saved with its images and extracted contact details.'
+        : status.description;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -409,11 +534,11 @@ class _StatusCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    status.label,
+                    label,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 3),
-                  Text(status.description),
+                  Text(description),
                 ],
               ),
             ),
@@ -424,6 +549,9 @@ class _StatusCard extends StatelessWidget {
   }
 
   IconData _icon(CompatibilityStatus status) {
+    if (card.isVisitingCard) {
+      return Icons.contact_page_outlined;
+    }
     return switch (status) {
       CompatibilityStatus.barcodeDisplayable => Icons.qr_code_2,
       CompatibilityStatus.nfcReadable => Icons.nfc,

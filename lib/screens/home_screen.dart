@@ -110,7 +110,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 TextField(
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Search cards, issuers, notes, or codes',
+                    hintText:
+                        'Search cards, contacts, issuers, notes, or codes',
                   ),
                   onChanged: (value) => setState(() => _query = value),
                 ),
@@ -433,12 +434,15 @@ class _HomeScreenState extends State<HomeScreen> {
       final statusMatches = switch (_statusFilter) {
         _StatusFilter.all => true,
         _StatusFilter.ready =>
-          card.compatibilityStatus == CompatibilityStatus.barcodeDisplayable ||
+          card.isVisitingCard ||
+              card.compatibilityStatus ==
+                  CompatibilityStatus.barcodeDisplayable ||
               card.compatibilityStatus == CompatibilityStatus.nfcReadable,
         _StatusFilter.needsTest =>
           card.compatibilityStatus == CompatibilityStatus.untested,
         _StatusFilter.reference =>
-          card.compatibilityStatus == CompatibilityStatus.referenceOnly,
+          !card.isVisitingCard &&
+              card.compatibilityStatus == CompatibilityStatus.referenceOnly,
       };
       final queryMatches =
           normalizedQuery.isEmpty ||
@@ -453,6 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ...card.contactPhones,
             ...card.contactEmails,
             ...card.contactWebsites,
+            card.rawOcrText,
           ].any((value) => value.toLowerCase().contains(normalizedQuery));
       return categoryMatches && statusMatches && queryMatches;
     }).toList();
