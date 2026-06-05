@@ -9,6 +9,7 @@ import 'package:card_box/screens/archived_cards_screen.dart';
 import 'package:card_box/screens/app_lock_settings_screen.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
+import 'package:card_box/screens/card_reference_present_screen.dart';
 import 'package:card_box/screens/compatibility_test_screen.dart';
 import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
@@ -424,6 +425,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.of(this.context).push(
                         MaterialPageRoute(
                           builder: (_) => BarcodePresentScreen(card: card),
+                        ),
+                      );
+                    },
+                  ),
+                if (!card.hasBarcode && card.hasPhotos)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.credit_card),
+                    title: const Text('Show card'),
+                    subtitle: const Text(
+                      'Open the saved front and back images full screen',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(this.context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CardReferencePresentScreen(card: card),
                         ),
                       );
                     },

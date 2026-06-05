@@ -6,6 +6,7 @@ import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_image_viewer_screen.dart';
+import 'package:card_box/screens/card_reference_present_screen.dart';
 import 'package:card_box/screens/compatibility_test_screen.dart';
 import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
@@ -253,6 +254,16 @@ class _ActionHeader extends StatelessWidget {
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => BarcodePresentScreen(card: card),
+                      ),
+                    ),
+                  ),
+                if (!card.hasBarcode && card.hasPhotos)
+                  FilledButton.icon(
+                    icon: const Icon(Icons.credit_card),
+                    label: const Text('Show card'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CardReferencePresentScreen(card: card),
                       ),
                     ),
                   ),

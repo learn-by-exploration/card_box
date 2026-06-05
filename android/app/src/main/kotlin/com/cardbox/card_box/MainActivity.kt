@@ -2,10 +2,8 @@ package com.cardbox.card_box
 
 import android.content.ClipData
 import android.content.Intent
-import android.provider.Settings
 import android.net.Uri
-import android.os.Bundle
-import android.view.WindowManager
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -15,14 +13,6 @@ import java.io.File
 class MainActivity : FlutterFragmentActivity() {
     private val fileShareChannel = "card_box/file_share"
     private val deviceSettingsChannel = "card_box/device_settings"
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE,
-        )
-    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

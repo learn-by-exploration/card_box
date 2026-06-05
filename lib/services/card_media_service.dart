@@ -73,12 +73,16 @@ class CardMediaService {
         return null;
       }
       final bytes = await File(cropped.path).readAsBytes();
-      return media_store.storeImageBytes(
+      final storedPath = await media_store.storeImageBytes(
         bytes,
         sourcePath: cropped.path,
         cardId: cardId,
         side: side,
       );
+      if (cropped.path != existingPath) {
+        await _deleteTemporaryFiles(<String>[cropped.path]);
+      }
+      return storedPath;
     } on PlatformException catch (error) {
       final message = error.message?.trim();
       if (message != null && message.isNotEmpty) {

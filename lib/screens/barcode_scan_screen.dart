@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -31,9 +33,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
   _ScanMode _scanMode = _ScanMode.barcode;
   bool _scannerEnabled = false;
   bool _didReturnResult = false;
-  bool _torchEnabled = false;
   bool _switchingMode = false;
   bool _resumeScannerAfterSettings = false;
+  bool _resumeScannerAfterBackground = false;
   int _scannerGeneration = 0;
   String? _scannerErrorMessage;
   String? _candidatePayload;
@@ -51,22 +53,38 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller.dispose();
+    unawaited(_controller.dispose());
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed ||
-        !_resumeScannerAfterSettings ||
-        !_scannerEnabled ||
-        _didReturnResult ||
-        _candidatePayload != null ||
-        _switchingMode) {
-      return;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if ((!_resumeScannerAfterSettings && !_resumeScannerAfterBackground) ||
+            !_scannerEnabled ||
+            _didReturnResult ||
+            _candidatePayload != null ||
+            _switchingMode) {
+          return;
+        }
+        _resumeScannerAfterSettings = false;
+        _resumeScannerAfterBackground = false;
+        _retryScannerAfterError();
+        return;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        if (!_scannerEnabled || _didReturnResult || _switchingMode) {
+          return;
+        }
+        if (_controller.value.isRunning) {
+          _resumeScannerAfterBackground = true;
+          unawaited(_suspendScannerForBackground());
+        }
+        return;
     }
-    _resumeScannerAfterSettings = false;
-    _retryScannerAfterError();
   }
 
   @override
@@ -76,18 +94,23 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
         title: const Text('Scan barcode or QR'),
         actions: [
           if (_scannerEnabled)
-            IconButton(
-              tooltip: _torchEnabled ? 'Turn torch off' : 'Turn torch on',
-              onPressed: () async {
-                await _controller.toggleTorch();
-                if (!mounted) {
-                  return;
-                }
-                setState(() => _torchEnabled = !_torchEnabled);
+            ValueListenableBuilder<MobileScannerState>(
+              valueListenable: _controller,
+              builder: (context, state, _) {
+                final torchEnabled = state.torchState == TorchState.on;
+                final torchUnavailable =
+                    !state.isRunning ||
+                    state.torchState == TorchState.unavailable ||
+                    _candidatePayload != null ||
+                    _switchingMode;
+                return IconButton(
+                  tooltip: torchEnabled ? 'Turn torch off' : 'Turn torch on',
+                  onPressed: torchUnavailable ? null : _toggleTorch,
+                  icon: Icon(
+                    torchEnabled ? Icons.flashlight_off : Icons.flashlight_on,
+                  ),
+                );
               },
-              icon: Icon(
-                _torchEnabled ? Icons.flashlight_off : Icons.flashlight_on,
-              ),
             ),
         ],
       ),
@@ -98,7 +121,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
               ? _ConsentPanel(
                   selectedMode: _scanMode,
                   onModeChanged: _changeMode,
-                  onStart: () => setState(() => _scannerEnabled = true),
+                  onStart: _enableScanner,
                 )
               : LayoutBuilder(
                   builder: (context, constraints) {
@@ -227,6 +250,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
 
   MobileScannerController _buildController(_ScanMode mode) {
     return MobileScannerController(
+      autoStart: false,
       cameraResolution: _preferredCameraResolution,
       detectionSpeed: DetectionSpeed.normal,
       detectionTimeoutMs: mode == _ScanMode.qr ? 250 : 400,
@@ -314,7 +338,6 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _lastSeenPayload = null;
       _stableHits = 0;
       _scannerErrorMessage = null;
-      _torchEnabled = false;
     });
     await Future<void>.delayed(Duration.zero);
     await oldController.dispose();
@@ -324,6 +347,13 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       return;
     }
 
+    if (_scannerEnabled) {
+      await _startScanner();
+    }
+
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _switchingMode = false;
     });
@@ -362,11 +392,10 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _stableHits = 0;
       _lastSeenPayload = null;
     });
-    _controller.stop();
   }
 
   void _handleScannerError(Object error, StackTrace stackTrace) {
-    if (!mounted) {
+    if (!mounted || _didReturnResult || _candidatePayload != null) {
       return;
     }
     setState(() {
@@ -445,12 +474,13 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       return;
     }
     _didReturnResult = true;
-    Navigator.of(context).pop(
-      ScannedCode(
-        payload: _candidatePayload!,
-        format: _candidateFormat ?? 'unknown',
-      ),
+    _resumeScannerAfterSettings = false;
+    _resumeScannerAfterBackground = false;
+    final result = ScannedCode(
+      payload: _candidatePayload!,
+      format: _candidateFormat ?? 'unknown',
     );
+    unawaited(_closeScannerWithResult(result));
   }
 
   Future<void> _resetCandidate() async {
@@ -461,7 +491,10 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _lastSeenPayload = null;
       _stableHits = 0;
     });
-    await _controller.start();
+    if (_controller.value.isRunning) {
+      return;
+    }
+    await _startScanner();
   }
 
   Future<void> _retryScannerAfterError() async {
@@ -472,8 +505,104 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _lastSeenPayload = null;
       _stableHits = 0;
     });
-    await _controller.stop();
-    await _controller.start();
+    await _startScanner(restart: true);
+  }
+
+  Future<void> _enableScanner() async {
+    setState(() {
+      _scannerEnabled = true;
+      _scannerErrorMessage = null;
+      _candidatePayload = null;
+      _candidateFormat = null;
+      _lastSeenPayload = null;
+      _stableHits = 0;
+    });
+    await Future<void>.delayed(Duration.zero);
+    await _startScanner();
+  }
+
+  Future<void> _startScanner({bool restart = false}) async {
+    try {
+      if (restart && _controller.value.isRunning) {
+        await _controller.stop();
+      }
+      await _controller.start();
+      final error = _controller.value.error;
+      if (!mounted || error == null) {
+        return;
+      }
+      setState(() {
+        _scannerErrorMessage = _friendlyScannerError(
+          errorMessage: error.errorDetails?.message ?? error.errorCode.message,
+          errorCode: error.errorCode,
+        );
+      });
+    } on MobileScannerException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _scannerErrorMessage = _friendlyScannerError(
+          errorMessage: error.errorDetails?.message ?? error.errorCode.message,
+          errorCode: error.errorCode,
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _scannerErrorMessage = _friendlyScannerError(
+          errorMessage: error.toString(),
+        );
+      });
+    }
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _controller.toggleTorch();
+    } on MobileScannerException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _scannerErrorMessage = _friendlyScannerError(
+          errorMessage: error.errorDetails?.message ?? error.errorCode.message,
+          errorCode: error.errorCode,
+        );
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _scannerErrorMessage =
+            'The torch is not available right now. Try reopening the scanner.';
+      });
+    }
+  }
+
+  Future<void> _closeScannerWithResult(ScannedCode result) async {
+    try {
+      if (_controller.value.isRunning) {
+        await _controller.stop();
+      }
+    } catch (_) {
+      // The route is closing anyway; ignore shutdown errors here.
+    }
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop(result);
+  }
+
+  Future<void> _suspendScannerForBackground() async {
+    try {
+      await _controller.stop();
+    } catch (_) {
+      // Best-effort camera release for lifecycle transitions.
+    }
   }
 }
 
