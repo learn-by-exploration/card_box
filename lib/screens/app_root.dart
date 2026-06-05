@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 
+import 'package:card_box/models/recovered_media_draft.dart';
 import 'package:card_box/screens/app_lock_screen.dart';
 import 'package:card_box/screens/home_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/media_recovery_service.dart';
 
 class AppRoot extends StatefulWidget {
   const AppRoot({
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.mediaRecoveryService,
+    this.recoveredMediaDraft,
   });
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final MediaRecoveryService mediaRecoveryService;
+  final RecoveredMediaDraft? recoveredMediaDraft;
 
   @override
   State<AppRoot> createState() => _AppRootState();
@@ -21,10 +27,12 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   bool _obscureContent = false;
+  RecoveredMediaDraft? _recoveredMediaDraft;
 
   @override
   void initState() {
     super.initState();
+    _recoveredMediaDraft = widget.recoveredMediaDraft;
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -73,6 +81,10 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
             : HomeScreen(
                 repository: widget.repository,
                 appLockService: widget.appLockService,
+                mediaRecoveryService: widget.mediaRecoveryService,
+                recoveredMediaDraft: _recoveredMediaDraft,
+                onRecoveredMediaUsed: _clearRecoveredMedia,
+                onRecoveredMediaDiscarded: _discardRecoveredMedia,
               );
         return Stack(
           fit: StackFit.expand,
@@ -83,5 +95,24 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
         );
       },
     );
+  }
+
+  void _clearRecoveredMedia() {
+    if (_recoveredMediaDraft == null) {
+      return;
+    }
+    setState(() => _recoveredMediaDraft = null);
+  }
+
+  Future<void> _discardRecoveredMedia() async {
+    final draft = _recoveredMediaDraft;
+    if (draft == null) {
+      return;
+    }
+    await widget.mediaRecoveryService.discardRecoveredDraft(draft);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _recoveredMediaDraft = null);
   }
 }

@@ -5,6 +5,7 @@ import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_crypto_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/file_share_service.dart';
 
 class ExportImportScreen extends StatefulWidget {
   const ExportImportScreen({
@@ -23,6 +24,7 @@ class ExportImportScreen extends StatefulWidget {
 class _ExportImportScreenState extends State<ExportImportScreen> {
   final _backupFileService = BackupFileService();
   final _backupCryptoService = BackupCryptoService();
+  final _fileShareService = const FileShareService();
   BackupFileInfo? _latestBackup;
   String _message = '';
   bool _exporting = false;
@@ -47,7 +49,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Card Box keeps data local. Create a real backup file that includes card data and saved photos. Backups are saved to Downloads when the device exposes that folder, otherwise to the app backup folder. Use encrypted backup when you want password protection for the exported file.',
+                    'Card Box keeps data local. Create a real backup file that includes card data and saved photos. On mobile, Card Box also opens the system share sheet so you can save or send the backup right away. Use encrypted backup when you want password protection for the exported file.',
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -59,7 +61,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
                         label: Text(
                           _exporting
                               ? 'Creating backup...'
-                              : 'Create standard backup',
+                              : 'Create and share standard backup',
                         ),
                         onPressed: _exporting ? null : _exportPlainBackup,
                       ),
@@ -68,7 +70,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
                         label: Text(
                           _exporting
                               ? 'Creating encrypted backup...'
-                              : 'Create encrypted backup',
+                              : 'Create and share encrypted backup',
                         ),
                         onPressed: _exporting ? null : _exportEncryptedBackup,
                       ),
@@ -172,10 +174,16 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         setState(() => _message = 'Backup export canceled.');
         return;
       }
+      final shared = await _fileShareService.shareFile(
+        path: backup.path,
+        subject: backup.fileName,
+        text: 'Card Box backup file',
+      );
       setState(() {
         _latestBackup = backup;
         _message =
-            '${mode == _BackupExportMode.encrypted ? 'Encrypted' : 'Standard'} backup file created: ${backup.fileName}';
+            '${mode == _BackupExportMode.encrypted ? 'Encrypted' : 'Standard'} backup file created: ${backup.fileName}'
+            '${shared ? ' and opened in the share sheet.' : '.'}';
       });
     } on UnsupportedError catch (error) {
       setState(() => _message = error.message ?? 'Backup export unavailable.');
@@ -221,8 +229,21 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         );
         label = '$label (encrypted)';
       }
-      final count = await widget.repository.importPlainJson(rawJson);
-      setState(() => _message = 'Imported $count card(s) from $label.');
+      final result = await widget.repository.importPlainJsonProtected(rawJson);
+      final message = StringBuffer(
+        'Imported ${result.importedCount} card(s) from $label.',
+      );
+      if (result.addedCount > 0 || result.updatedCount > 0) {
+        message.write(
+          ' Added ${result.addedCount}, updated ${result.updatedCount}.',
+        );
+      }
+      if (result.skippedOlderCount > 0) {
+        message.write(
+          ' Kept ${result.skippedOlderCount} newer card(s) already on this device.',
+        );
+      }
+      setState(() => _message = message.toString());
     } on FormatException catch (error) {
       setState(() => _message = error.message);
     } on UnsupportedError catch (error) {

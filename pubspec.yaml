@@ -31,15 +31,15 @@ dependencies:
   flutter:
     sdk: flutter
 
-  app_settings:
-    path: third_party/app_settings
   barcode: ^2.2.9
   barcode_widget: ^2.0.4
   cryptography: ^2.9.0
   cupertino_icons: ^1.0.8
-  edge_detection_scan: ^0.0.1
+  drift: ^2.33.0
+  drift_flutter: ^0.3.0
   file_selector: ^1.1.0
   flutter_secure_storage: ^10.3.1
+  google_mlkit_document_scanner: ^0.4.1
   google_mlkit_text_recognition: ^0.15.0
   image_picker: ^1.2.2
   image_cropper: ^12.2.1
@@ -50,12 +50,18 @@ dependencies:
     path: third_party/nfc_manager
   path_provider: ^2.1.5
   shared_preferences: ^2.3.4
+  sqlite3_flutter_libs: ^0.6.0+eol
   url_launcher: ^6.3.2
 
 dev_dependencies:
+  build_runner: ^2.10.1
+  drift_dev: ^2.33.0
+  file_selector_platform_interface: ^2.6.2
   flutter_launcher_icons: ^0.14.4
   flutter_test:
     sdk: flutter
+  image_picker_platform_interface: ^2.11.1
+  path_provider_platform_interface: ^2.1.2
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

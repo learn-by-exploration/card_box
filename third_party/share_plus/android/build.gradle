@@ -1,7 +1,7 @@
-group 'dev.fluttercommunity.plus.share'
-version '1.0-SNAPSHOT'
+group = 'dev.fluttercommunity.plus.share'
+version = '1.0-SNAPSHOT'
 
-rootProject.allprojects {
+allprojects {
     repositories {
         google()
         mavenCentral()
@@ -9,11 +9,14 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'com.android.built-in-kotlin'
+apply plugin: 'kotlin-android'
 
 android {
-    namespace 'dev.fluttercommunity.plus.share'
-    compileSdk = flutter.compileSdkVersion
+    if (project.android.hasProperty("namespace")) {
+        namespace = 'dev.fluttercommunity.plus.share'
+    }
+
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -32,11 +35,11 @@ android {
     lintOptions {
         disable 'InvalidPackage'
     }
+}
 
-    dependencies {
-        implementation 'androidx.core:core-ktx:1.16.0'
-        implementation 'androidx.annotation:annotation:1.9.1'
-    }
+dependencies {
+    implementation 'androidx.core:core-ktx:1.16.0'
+    implementation 'androidx.annotation:annotation:1.9.1'
 }
 
 kotlin {

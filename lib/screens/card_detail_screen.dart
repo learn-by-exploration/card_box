@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_image_viewer_screen.dart';
 import 'package:card_box/screens/compatibility_test_screen.dart';
+import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/contact_action_service.dart';
+import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/vcard_export_service.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
@@ -48,15 +51,25 @@ class CardDetailScreen extends StatelessWidget {
               IconButton(
                 tooltip: 'Edit',
                 icon: const Icon(Icons.edit),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => EditCardScreen(
-                      repository: repository,
-                      appLockService: appLockService,
-                      existingCard: card,
+                onPressed: () async {
+                  final preferences = await SharedPreferences.getInstance();
+                  final recoveryService = MediaRecoveryService(
+                    preferences: preferences,
+                  );
+                  if (!context.mounted) {
+                    return;
+                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => EditCardScreen(
+                        repository: repository,
+                        appLockService: appLockService,
+                        mediaRecoveryService: recoveryService,
+                        existingCard: card,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ),
@@ -174,6 +187,16 @@ class _ActionHeader extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (card.isVisitingCard)
+                  FilledButton.icon(
+                    icon: const Icon(Icons.qr_code_2_outlined),
+                    label: const Text('Show contact QR'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ContactQrScreen(card: card),
+                      ),
+                    ),
+                  ),
                 if (card.isVisitingCard)
                   FilledButton.icon(
                     icon: const Icon(Icons.copy_all_outlined),

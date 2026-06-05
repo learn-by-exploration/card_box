@@ -1,3 +1,6 @@
+// ignore_for_file: prefer_initializing_formals
+
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -6,24 +9,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:card_box/models/card_category.dart';
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
+import 'package:card_box/services/card_database.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_storage_codec.dart';
 
 class CardRepository extends ChangeNotifier {
-  static const _storageKey = 'card_box.cards.v1';
+  static const _legacyStorageKey = 'card_box.cards.v1';
 
   CardRepository({
+    CardDatabase? database,
     CardStorageCodec? storageCodec,
     CardMediaManager? mediaManager,
+    SharedPreferences? legacyPreferences,
     this.seedDemoCards = false,
-  }) : _storageCodec = storageCodec ?? CardStorageCodec(),
-       _mediaManager = mediaManager ?? const DefaultCardMediaManager();
+  }) : _database = database ?? CardDatabase.defaults(),
+       _storageCodec = storageCodec ?? CardStorageCodec(),
+       _mediaManager = mediaManager ?? const DefaultCardMediaManager(),
+       _legacyPreferences = legacyPreferences,
+       _ownsDatabase = database == null;
 
   final List<WalletCard> _cards = [];
+  final CardDatabase _database;
   final CardStorageCodec _storageCodec;
   final CardMediaManager _mediaManager;
+  final SharedPreferences? _legacyPreferences;
+  final bool _ownsDatabase;
   final bool seedDemoCards;
-  late SharedPreferences _preferences;
 
   List<WalletCard> get cards {
     return List.unmodifiable(_sortedCards(includeArchived: false));
@@ -34,22 +45,48 @@ class CardRepository extends ChangeNotifier {
   }
 
   Future<void> init() async {
-    _preferences = await SharedPreferences.getInstance();
-    final stored = _preferences.getString(_storageKey);
-    if (stored == null || stored.isEmpty) {
-      if (seedDemoCards) {
-        _cards.addAll(_demoCards());
-      }
-      await _save();
-      return;
-    }
-    final payload = _storageCodec.decodeStored(stored);
     _cards
       ..clear()
-      ..addAll(payload.cards);
-    if (payload.needsRewrite) {
-      await _save();
+      ..addAll(await _database.loadCards());
+    if (_cards.isNotEmpty) {
+      return;
     }
+    final migrated = await _migrateLegacyStorageIfNeeded();
+    if (migrated) {
+      _cards
+        ..clear()
+        ..addAll(await _database.loadCards());
+      return;
+    }
+    if (seedDemoCards) {
+      _cards.addAll(_demoCards());
+      await _database.replaceAllCards(_cards);
+    }
+  }
+
+  Future<bool> _migrateLegacyStorageIfNeeded() async {
+    final preferences =
+        _legacyPreferences ?? await SharedPreferences.getInstance();
+    final stored = preferences.getString(_legacyStorageKey);
+    if (stored == null || stored.isEmpty) {
+      return false;
+    }
+    final payload = _storageCodec.decodeStored(stored);
+    if (payload.cards.isEmpty) {
+      await preferences.remove(_legacyStorageKey);
+      return false;
+    }
+    await _database.replaceAllCards(payload.cards);
+    await preferences.remove(_legacyStorageKey);
+    return true;
+  }
+
+  @override
+  void dispose() {
+    if (_ownsDatabase) {
+      unawaited(_database.close());
+    }
+    super.dispose();
   }
 
   WalletCard? findById(String id) {
@@ -71,7 +108,7 @@ class CardRepository extends ChangeNotifier {
       _cards[index] = updatedCard;
       await _cleanupReplacedImages(previous: previous, next: updatedCard);
     }
-    await _save();
+    await _database.upsertCard(updatedCard);
     notifyListeners();
   }
 
@@ -106,7 +143,7 @@ class CardRepository extends ChangeNotifier {
     }
     final removed = _cards.removeAt(index);
     await _cleanupCardImages(removed);
-    await _save();
+    await _database.deleteCardById(id);
     notifyListeners();
   }
 
@@ -137,8 +174,16 @@ class CardRepository extends ChangeNotifier {
   }
 
   Future<int> importPlainJson(String rawJson) async {
+    final result = await importPlainJsonProtected(rawJson);
+    return result.importedCount;
+  }
+
+  Future<ImportCardsResult> importPlainJsonProtected(String rawJson) async {
     final payload = _storageCodec.decodeBackup(rawJson);
     final importedCards = <WalletCard>[];
+    var addedCount = 0;
+    var updatedCount = 0;
+    var skippedOlderCount = 0;
     for (final card in payload.cards) {
       importedCards.add(
         await _hydrateImportedCard(card, attachments: payload.imageAttachments),
@@ -148,20 +193,40 @@ class CardRepository extends ChangeNotifier {
       final index = _cards.indexWhere((existing) => existing.id == card.id);
       if (index == -1) {
         _cards.add(card);
+        addedCount += 1;
       } else {
         final previous = _cards[index];
+        if (previous.updatedAt.isAfter(card.updatedAt)) {
+          skippedOlderCount += 1;
+          continue;
+        }
         _cards[index] = card;
         await _cleanupReplacedImages(previous: previous, next: card);
+        updatedCount += 1;
       }
     }
-    await _save();
+    if (importedCards.isNotEmpty) {
+      final cardsToPersist = <WalletCard>[];
+      for (final card in importedCards) {
+        final current = findById(card.id);
+        if (current == null) {
+          continue;
+        }
+        if (identical(current, card) || current.updatedAt == card.updatedAt) {
+          cardsToPersist.add(current);
+        }
+      }
+      if (cardsToPersist.isNotEmpty) {
+        await _database.upsertCards(cardsToPersist);
+      }
+    }
     notifyListeners();
-    return importedCards.length;
-  }
-
-  Future<void> _save() async {
-    final encoded = _storageCodec.encodeStored(_cards);
-    await _preferences.setString(_storageKey, encoded);
+    return ImportCardsResult(
+      importedCount: addedCount + updatedCount,
+      addedCount: addedCount,
+      updatedCount: updatedCount,
+      skippedOlderCount: skippedOlderCount,
+    );
   }
 
   List<WalletCard> _sortedCards({required bool includeArchived}) {
@@ -312,4 +377,18 @@ class CardRepository extends ChangeNotifier {
       ),
     ];
   }
+}
+
+class ImportCardsResult {
+  const ImportCardsResult({
+    required this.importedCount,
+    required this.addedCount,
+    required this.updatedCount,
+    required this.skippedOlderCount,
+  });
+
+  final int importedCount;
+  final int addedCount;
+  final int updatedCount;
+  final int skippedOlderCount;
 }

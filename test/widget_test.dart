@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,16 +13,20 @@ import 'package:card_box/models/card_type.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_crypto_service.dart';
+import 'package:card_box/services/card_database.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/card_storage_codec.dart';
 import 'package:card_box/services/contact_action_service.dart';
 import 'package:card_box/services/device_auth_service.dart';
+import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/secure_store.dart';
 import 'package:card_box/services/vcard_export_service.dart';
 import 'package:card_box/services/visiting_card_ocr_service.dart';
 
 void main() {
+  driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+
   test('WalletCard round-trips through JSON', () {
     final now = DateTime(2026, 6, 3);
     final card = WalletCard(
@@ -52,13 +57,16 @@ void main() {
 
   test('CardRepository exports and imports plain JSON', () async {
     SharedPreferences.setMockInitialValues({});
-    final repository = CardRepository(seedDemoCards: true);
+    final repository = CardRepository(
+      seedDemoCards: true,
+      database: CardDatabase.inMemory(),
+    );
     await repository.init();
 
     final exported = await repository.exportPlainJson();
 
     SharedPreferences.setMockInitialValues({});
-    final secondRepository = CardRepository();
+    final secondRepository = CardRepository(database: CardDatabase.inMemory());
     await secondRepository.init();
     final count = await secondRepository.importPlainJson(exported);
 
@@ -71,7 +79,7 @@ void main() {
 
   test('CardRepository starts empty by default on a fresh install', () async {
     SharedPreferences.setMockInitialValues({});
-    final repository = CardRepository();
+    final repository = CardRepository(database: CardDatabase.inMemory());
 
     await repository.init();
 
@@ -88,7 +96,10 @@ void main() {
         extension: '.jpg',
       ),
     );
-    final repository = CardRepository(mediaManager: mediaManager);
+    final repository = CardRepository(
+      mediaManager: mediaManager,
+      database: CardDatabase.inMemory(),
+    );
     await repository.init();
     await repository.upsert(
       WalletCard(
@@ -105,7 +116,10 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     final secondMediaManager = _FakeCardMediaManager();
-    final secondRepository = CardRepository(mediaManager: secondMediaManager);
+    final secondRepository = CardRepository(
+      mediaManager: secondMediaManager,
+      database: CardDatabase.inMemory(),
+    );
     await secondRepository.init();
     await secondRepository.importPlainJson(exported);
 
@@ -132,7 +146,10 @@ void main() {
         extension: '.jpg',
       ),
     );
-    final repository = CardRepository(mediaManager: mediaManager);
+    final repository = CardRepository(
+      mediaManager: mediaManager,
+      database: CardDatabase.inMemory(),
+    );
     await repository.init();
     await repository.upsert(
       WalletCard(
@@ -159,7 +176,10 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     final secondMediaManager = _FakeCardMediaManager();
-    final secondRepository = CardRepository(mediaManager: secondMediaManager);
+    final secondRepository = CardRepository(
+      mediaManager: secondMediaManager,
+      database: CardDatabase.inMemory(),
+    );
     await secondRepository.init();
     await secondRepository.importPlainJson(exported);
 
@@ -186,7 +206,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'card_box.cards.v1': legacyCardsJson,
     });
-    final repository = CardRepository();
+    final repository = CardRepository(database: CardDatabase.inMemory());
 
     await repository.init();
 
@@ -194,11 +214,7 @@ void main() {
     expect(repository.cards.first.name, 'Legacy library card');
 
     final preferences = await SharedPreferences.getInstance();
-    final rewritten = preferences.getString('card_box.cards.v1');
-    expect(rewritten, isNotNull);
-    final migrated = CardStorageCodec().decodeStored(rewritten!);
-    expect(migrated.schemaVersion, CardStorageCodec.currentSchemaVersion);
-    expect(migrated.cards.first.frontImagePath, '');
+    expect(preferences.getString('card_box.cards.v1'), isNull);
   });
 
   test('CardStorageCodec migrates legacy storage fixture photo paths', () {
@@ -219,7 +235,7 @@ void main() {
 
   test('CardRepository imports legacy backup version', () async {
     SharedPreferences.setMockInitialValues({});
-    final repository = CardRepository();
+    final repository = CardRepository(database: CardDatabase.inMemory());
     await repository.init();
 
     final legacyBackup = jsonEncode({
@@ -366,7 +382,10 @@ void main() {
 
   test('CardRepository can archive and restore cards', () async {
     SharedPreferences.setMockInitialValues({});
-    final repository = CardRepository(seedDemoCards: true);
+    final repository = CardRepository(
+      seedDemoCards: true,
+      database: CardDatabase.inMemory(),
+    );
     await repository.init();
 
     await repository.archive('demo-library');
@@ -441,7 +460,10 @@ void main() {
   testWidgets('Card Box starts with demo acceptance cards', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final repository = CardRepository(seedDemoCards: true);
+    final repository = CardRepository(
+      seedDemoCards: true,
+      database: CardDatabase.inMemory(),
+    );
     await repository.init();
     final appLockService = AppLockService(
       preferences: preferences,
@@ -450,8 +472,13 @@ void main() {
     );
     await appLockService.init();
 
+    final mediaRecoveryService = MediaRecoveryService(preferences: preferences);
     await tester.pumpWidget(
-      CardBoxApp(repository: repository, appLockService: appLockService),
+      CardBoxApp(
+        repository: repository,
+        appLockService: appLockService,
+        mediaRecoveryService: mediaRecoveryService,
+      ),
     );
 
     expect(find.text('Card Box'), findsOneWidget);

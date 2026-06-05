@@ -60,12 +60,42 @@ class VCardExportService {
     return normalized.isEmpty ? 'contact' : normalized;
   }
 
+  String buildQrPayload(WalletCard card) {
+    final parts = <String>[
+      'MECARD:',
+      if (card.name.trim().isNotEmpty) 'N:${_escapeQr(card.name)};',
+      if (card.issuer.trim().isNotEmpty) 'ORG:${_escapeQr(card.issuer)};',
+      if (card.contactTitle.trim().isNotEmpty)
+        'TITLE:${_escapeQr(card.contactTitle)};',
+      for (final phone in card.contactPhones)
+        if (phone.trim().isNotEmpty) 'TEL:${_escapeQr(phone)};',
+      for (final email in card.contactEmails)
+        if (email.trim().isNotEmpty) 'EMAIL:${_escapeQr(email)};',
+      for (final website in card.contactWebsites)
+        if (website.trim().isNotEmpty) 'URL:${_escapeQr(website)};',
+      if (card.contactAddress.trim().isNotEmpty)
+        'ADR:${_escapeQr(card.contactAddress)};',
+      if (card.notes.trim().isNotEmpty) 'NOTE:${_escapeQr(card.notes)};',
+      ';',
+    ];
+    return parts.join();
+  }
+
   String _escape(String value) {
     return value
         .replaceAll(r'\', r'\\')
         .replaceAll('\n', r'\n')
         .replaceAll(';', r'\;')
         .replaceAll(',', r'\,');
+  }
+
+  String _escapeQr(String value) {
+    return value
+        .replaceAll(r'\', '')
+        .replaceAll(':', r'\:')
+        .replaceAll(';', r'\;')
+        .replaceAll(',', r'\,')
+        .replaceAll('\n', ' ');
   }
 
   _NameParts? _splitName(String value) {

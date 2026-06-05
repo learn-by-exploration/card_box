@@ -31,64 +31,70 @@ class NfcService {
     }
 
     final completer = Completer<NfcScanResult>();
-
-    await NfcManager.instance.startSession(
-      pollingOptions: const {
-        NfcPollingOption.iso14443,
-        NfcPollingOption.iso15693,
-        NfcPollingOption.iso18092,
-      },
-      alertMessageIos: 'Hold your phone near the card.',
-      onSessionErrorIos: (error) {
-        if (!completer.isCompleted) {
-          completer.complete(
-            NfcScanResult(
-              status: CompatibilityStatus.unsupported,
-              summary: 'NFC session error: ${error.message}',
-              detail: 'The iOS reader session ended before a tag was saved.',
-            ),
-          );
-        }
-      },
-      onDiscovered: (tag) async {
-        try {
-          final result = await _buildResult(tag);
-          if (!completer.isCompleted) {
-            completer.complete(result);
-          }
-          await NfcManager.instance.stopSession(
-            alertMessageIos: 'Tag read complete.',
-          );
-        } catch (error) {
+    try {
+      await NfcManager.instance.startSession(
+        pollingOptions: const {
+          NfcPollingOption.iso14443,
+          NfcPollingOption.iso15693,
+          NfcPollingOption.iso18092,
+        },
+        alertMessageIos: 'Hold your phone near the card.',
+        onSessionErrorIos: (error) {
           if (!completer.isCompleted) {
             completer.complete(
               NfcScanResult(
-                status: CompatibilityStatus.nfcDetectedNotReadable,
-                summary: 'Card detected, but the tag summary failed.',
-                detail: 'Error: $error',
+                status: CompatibilityStatus.unsupported,
+                summary: 'NFC session error: ${error.message}',
+                detail: 'The iOS reader session ended before a tag was saved.',
               ),
             );
           }
-          await NfcManager.instance.stopSession(
-            errorMessageIos: 'Unable to read this card.',
-          );
-        }
-      },
-    );
+        },
+        onDiscovered: (tag) async {
+          try {
+            final result = await _buildResult(tag);
+            if (!completer.isCompleted) {
+              completer.complete(result);
+            }
+            await _stopSessionSafely(alertMessageIos: 'Tag read complete.');
+          } catch (error) {
+            if (!completer.isCompleted) {
+              completer.complete(
+                NfcScanResult(
+                  status: CompatibilityStatus.nfcDetectedNotReadable,
+                  summary: 'Card detected, but the tag summary failed.',
+                  detail: 'Error: $error',
+                ),
+              );
+            }
+            await _stopSessionSafely(
+              errorMessageIos: 'Unable to read this card.',
+            );
+          }
+        },
+      );
 
-    return completer.future.timeout(
-      const Duration(seconds: 20),
-      onTimeout: () async {
-        await NfcManager.instance.stopSession(
-          errorMessageIos: 'Timed out waiting for a card.',
-        );
-        return const NfcScanResult(
-          status: CompatibilityStatus.unsupported,
-          summary: 'No NFC card was detected in time.',
-          detail: 'Try again with the card closer to the phone.',
-        );
-      },
-    );
+      return completer.future.timeout(
+        const Duration(seconds: 20),
+        onTimeout: () async {
+          await _stopSessionSafely(
+            errorMessageIos: 'Timed out waiting for a card.',
+          );
+          return const NfcScanResult(
+            status: CompatibilityStatus.unsupported,
+            summary: 'No NFC card was detected in time.',
+            detail: 'Try again with the card closer to the phone.',
+          );
+        },
+      );
+    } catch (error) {
+      await _stopSessionSafely();
+      return NfcScanResult(
+        status: CompatibilityStatus.unsupported,
+        summary: 'The NFC session could not be started.',
+        detail: 'Error: $error',
+      );
+    }
   }
 
   Future<NfcScanResult> _buildResult(NfcTag tag) async {
@@ -290,5 +296,20 @@ class NfcService {
     return bytes
         .map((value) => value.toRadixString(16).padLeft(2, '0'))
         .join(':');
+  }
+
+  Future<void> _stopSessionSafely({
+    String? alertMessageIos,
+    String? errorMessageIos,
+  }) async {
+    try {
+      await NfcManager.instance.stopSession(
+        alertMessageIos: alertMessageIos,
+        errorMessageIos: errorMessageIos,
+      );
+    } catch (_) {
+      // Session shutdown can race with device state; avoid surfacing that as a
+      // user-facing failure when we already have a meaningful result.
+    }
   }
 }

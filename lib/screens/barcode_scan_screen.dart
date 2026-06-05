@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:card_box/models/scanned_code.dart';
+import 'package:card_box/services/device_settings_service.dart';
+
+enum _ScanMode {
+  barcode('Barcode'),
+  qr('QR'),
+  all('All');
+
+  const _ScanMode(this.label);
+
+  final String label;
+}
 
 class BarcodeScanScreen extends StatefulWidget {
   const BarcodeScanScreen({super.key});
@@ -10,24 +21,52 @@ class BarcodeScanScreen extends StatefulWidget {
   State<BarcodeScanScreen> createState() => _BarcodeScanScreenState();
 }
 
-class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
-  final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    detectionTimeoutMs: 650,
-    autoZoom: true,
-  );
+class _BarcodeScanScreenState extends State<BarcodeScanScreen>
+    with WidgetsBindingObserver {
+  static const Size _preferredCameraResolution = Size(1920, 1080);
+
+  final DeviceSettingsService _deviceSettingsService =
+      const DeviceSettingsService();
+  late MobileScannerController _controller;
+  _ScanMode _scanMode = _ScanMode.barcode;
   bool _scannerEnabled = false;
   bool _didReturnResult = false;
+  bool _torchEnabled = false;
+  bool _switchingMode = false;
+  bool _resumeScannerAfterSettings = false;
+  int _scannerGeneration = 0;
+  String? _scannerErrorMessage;
   String? _candidatePayload;
   String? _candidateFormat;
   String? _lastSeenPayload;
   int _stableHits = 0;
-  bool _torchEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = _buildController(_scanMode);
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed ||
+        !_resumeScannerAfterSettings ||
+        !_scannerEnabled ||
+        _didReturnResult ||
+        _candidatePayload != null ||
+        _switchingMode) {
+      return;
+    }
+    _resumeScannerAfterSettings = false;
+    _retryScannerAfterError();
   }
 
   @override
@@ -57,26 +96,53 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
           padding: const EdgeInsets.all(16),
           child: !_scannerEnabled
               ? _ConsentPanel(
+                  selectedMode: _scanMode,
+                  onModeChanged: _changeMode,
                   onStart: () => setState(() => _scannerEnabled = true),
                 )
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    final scanWindow = Rect.fromCenter(
-                      center: Offset(
-                        constraints.maxWidth / 2,
-                        constraints.maxHeight / 2 - 20,
-                      ),
-                      width: constraints.maxWidth * 0.72,
-                      height: constraints.maxHeight * 0.34,
+                    final scanWindow = _buildScanWindow(
+                      constraints: constraints,
+                      mode: _scanMode,
                     );
                     return Stack(
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: MobileScanner(
+                            key: ValueKey(
+                              'scanner-${_scanMode.name}-$_scannerGeneration',
+                            ),
                             controller: _controller,
                             scanWindow: scanWindow,
                             onDetect: _handleDetection,
+                            onDetectError: _handleScannerError,
+                            errorBuilder: (context, error) {
+                              return _ScannerErrorPanel(
+                                message: _friendlyScannerError(
+                                  errorMessage:
+                                      error.errorDetails?.message ??
+                                      error.errorCode.name,
+                                  errorCode: error.errorCode,
+                                ),
+                                primaryLabel: _errorActionLabel(
+                                  error.errorCode,
+                                ),
+                                onPrimary: () =>
+                                    _handleScannerErrorAction(error.errorCode),
+                                secondaryLabel:
+                                    error.errorCode ==
+                                        MobileScannerErrorCode.permissionDenied
+                                    ? 'Retry scanner'
+                                    : null,
+                                onSecondary:
+                                    error.errorCode ==
+                                        MobileScannerErrorCode.permissionDenied
+                                    ? _retryScannerAfterError
+                                    : null,
+                              );
+                            },
                           ),
                         ),
                         _ScannerOverlay(scanWindow: scanWindow),
@@ -84,19 +150,30 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                           left: 24,
                           right: 24,
                           top: 24,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.68),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Text(
-                                'Hold the code steady inside the frame. Card Box will wait for a stable read before suggesting it.',
-                                style: TextStyle(color: Colors.white),
-                                textAlign: TextAlign.center,
+                          child: Column(
+                            children: [
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.68),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Text(
+                                    'Card Box waits for a stable read, then asks you to confirm it before saving.',
+                                    style: TextStyle(color: Colors.white),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 12),
+                              _ModeChipBar(
+                                selectedMode: _scanMode,
+                                onModeChanged: _switchingMode
+                                    ? null
+                                    : _changeMode,
+                              ),
+                            ],
                           ),
                         ),
                         if (_candidatePayload != null)
@@ -126,9 +203,14 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                               child: Padding(
                                 padding: const EdgeInsets.all(14),
                                 child: Text(
-                                  _stableHits == 0
-                                      ? 'Waiting for a code inside the frame.'
-                                      : 'Steady read in progress... $_stableHits/2 matches',
+                                  _scannerErrorMessage != null
+                                      ? _scannerErrorMessage!
+                                      : _switchingMode
+                                      ? 'Updating the scanner...'
+                                      : _stableHits == 0
+                                      ? _modeInstruction(_scanMode)
+                                      : 'Steady read in progress... '
+                                            '$_stableHits/${_requiredStableHits(_scanMode)} matches',
                                   textAlign: TextAlign.center,
                                 ),
                               ),
@@ -143,8 +225,112 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     );
   }
 
+  MobileScannerController _buildController(_ScanMode mode) {
+    return MobileScannerController(
+      cameraResolution: _preferredCameraResolution,
+      detectionSpeed: DetectionSpeed.normal,
+      detectionTimeoutMs: mode == _ScanMode.qr ? 250 : 400,
+      autoZoom: false,
+      formats: _formatsForMode(mode),
+    );
+  }
+
+  Rect _buildScanWindow({
+    required BoxConstraints constraints,
+    required _ScanMode mode,
+  }) {
+    final width = constraints.maxWidth;
+    final height = constraints.maxHeight;
+    final isBarcode = mode == _ScanMode.barcode;
+    final frameWidth = isBarcode ? width * 0.9 : width * 0.74;
+    final frameHeight = isBarcode ? height * 0.2 : width * 0.74;
+    return Rect.fromCenter(
+      center: Offset(width / 2, height / 2 - 8),
+      width: frameWidth.clamp(220.0, 420.0),
+      height: frameHeight.clamp(132.0, 340.0),
+    );
+  }
+
+  int _requiredStableHits(_ScanMode mode) {
+    return switch (mode) {
+      _ScanMode.barcode => 3,
+      _ScanMode.qr => 2,
+      _ScanMode.all => 3,
+    };
+  }
+
+  List<BarcodeFormat> _formatsForMode(_ScanMode mode) {
+    switch (mode) {
+      case _ScanMode.barcode:
+        return const [
+          BarcodeFormat.code128,
+          BarcodeFormat.code39,
+          BarcodeFormat.code93,
+          BarcodeFormat.codabar,
+          BarcodeFormat.ean13,
+          BarcodeFormat.ean8,
+          BarcodeFormat.itf14,
+          BarcodeFormat.itf2of5,
+          BarcodeFormat.itf2of5WithChecksum,
+          BarcodeFormat.upcA,
+          BarcodeFormat.upcE,
+          BarcodeFormat.pdf417,
+        ];
+      case _ScanMode.qr:
+        return const [
+          BarcodeFormat.qrCode,
+          BarcodeFormat.aztec,
+          BarcodeFormat.dataMatrix,
+        ];
+      case _ScanMode.all:
+        return const [];
+    }
+  }
+
+  String _modeInstruction(_ScanMode mode) {
+    switch (mode) {
+      case _ScanMode.barcode:
+        return 'Hold the barcode level inside the wide frame and let the camera settle for a beat.';
+      case _ScanMode.qr:
+        return 'Center the QR or square code inside the frame.';
+      case _ScanMode.all:
+        return 'Center the code inside the frame. If a 1D barcode feels jumpy, switch to Barcode mode.';
+    }
+  }
+
+  Future<void> _changeMode(_ScanMode mode) async {
+    if (_scanMode == mode || _switchingMode) {
+      return;
+    }
+    final oldController = _controller;
+    final newController = _buildController(mode);
+    setState(() {
+      _switchingMode = true;
+      _scanMode = mode;
+      _controller = newController;
+      _scannerGeneration += 1;
+      _candidatePayload = null;
+      _candidateFormat = null;
+      _lastSeenPayload = null;
+      _stableHits = 0;
+      _scannerErrorMessage = null;
+      _torchEnabled = false;
+    });
+    await Future<void>.delayed(Duration.zero);
+    await oldController.dispose();
+
+    if (!mounted) {
+      await newController.dispose();
+      return;
+    }
+
+    setState(() {
+      _switchingMode = false;
+    });
+  }
+
   void _handleDetection(BarcodeCapture capture) {
-    if (_didReturnResult || _candidatePayload != null) {
+    if (_didReturnResult || _candidatePayload != null || _switchingMode) {
       return;
     }
     final barcode = capture.barcodes.firstWhere(
@@ -163,7 +349,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       _stableHits = 1;
     }
 
-    if (_stableHits < 2) {
+    if (_stableHits < _requiredStableHits(_scanMode)) {
       if (mounted) {
         setState(() {});
       }
@@ -177,6 +363,81 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       _lastSeenPayload = null;
     });
     _controller.stop();
+  }
+
+  void _handleScannerError(Object error, StackTrace stackTrace) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _scannerErrorMessage = _friendlyScannerError(
+        errorMessage: error.toString(),
+      );
+      _candidatePayload = null;
+      _candidateFormat = null;
+      _lastSeenPayload = null;
+      _stableHits = 0;
+    });
+  }
+
+  String _friendlyScannerError({
+    required String errorMessage,
+    MobileScannerErrorCode? errorCode,
+  }) {
+    if (errorCode == MobileScannerErrorCode.permissionDenied) {
+      return 'Card Box needs camera access before it can scan visible codes.';
+    }
+    if (errorCode == MobileScannerErrorCode.unsupported) {
+      return 'This device could not start the live camera scanner.';
+    }
+
+    final message = errorMessage.toLowerCase();
+    if (message.contains('attempt to invoke a virtual method') ||
+        message.contains('null object reference')) {
+      return 'The live scanner hit a device-level Android camera error. Close and reopen the scanner, or switch modes if needed.';
+    }
+    return 'The live scanner ran into a camera error. Close and reopen the scanner if it stays stuck.';
+  }
+
+  String _errorActionLabel(MobileScannerErrorCode errorCode) {
+    switch (errorCode) {
+      case MobileScannerErrorCode.permissionDenied:
+        return 'Open settings';
+      case MobileScannerErrorCode.unsupported:
+        return 'Close scanner';
+      default:
+        return 'Retry scanner';
+    }
+  }
+
+  Future<void> _handleScannerErrorAction(
+    MobileScannerErrorCode errorCode,
+  ) async {
+    switch (errorCode) {
+      case MobileScannerErrorCode.permissionDenied:
+        _resumeScannerAfterSettings = true;
+        final opened = await _deviceSettingsService.openAppSettings();
+        if (!mounted) {
+          return;
+        }
+        if (!opened) {
+          _resumeScannerAfterSettings = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open app settings on this device.'),
+            ),
+          );
+        }
+        return;
+      case MobileScannerErrorCode.unsupported:
+        if (mounted) {
+          await Navigator.of(context).maybePop();
+        }
+        return;
+      default:
+        await _retryScannerAfterError();
+        return;
+    }
   }
 
   void _confirmCandidate() {
@@ -194,6 +455,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
 
   Future<void> _resetCandidate() async {
     setState(() {
+      _scannerErrorMessage = null;
       _candidatePayload = null;
       _candidateFormat = null;
       _lastSeenPayload = null;
@@ -201,11 +463,29 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     });
     await _controller.start();
   }
+
+  Future<void> _retryScannerAfterError() async {
+    setState(() {
+      _scannerErrorMessage = null;
+      _candidatePayload = null;
+      _candidateFormat = null;
+      _lastSeenPayload = null;
+      _stableHits = 0;
+    });
+    await _controller.stop();
+    await _controller.start();
+  }
 }
 
 class _ConsentPanel extends StatelessWidget {
-  const _ConsentPanel({required this.onStart});
+  const _ConsentPanel({
+    required this.selectedMode,
+    required this.onModeChanged,
+    required this.onStart,
+  });
 
+  final _ScanMode selectedMode;
+  final ValueChanged<_ScanMode> onModeChanged;
   final VoidCallback onStart;
 
   @override
@@ -229,6 +509,11 @@ class _ConsentPanel extends StatelessWidget {
                   'Card Box uses the camera only after you choose to scan a visible barcode or QR code.',
                 ),
                 const SizedBox(height: 16),
+                _ModeChipBar(
+                  selectedMode: selectedMode,
+                  onModeChanged: onModeChanged,
+                ),
+                const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: onStart,
                   icon: const Icon(Icons.qr_code_scanner),
@@ -239,6 +524,35 @@ class _ConsentPanel extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ModeChipBar extends StatelessWidget {
+  const _ModeChipBar({required this.selectedMode, required this.onModeChanged});
+
+  final _ScanMode selectedMode;
+  final ValueChanged<_ScanMode>? onModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final mode in _ScanMode.values)
+          ChoiceChip(
+            label: Text(mode.label),
+            selected: mode == selectedMode,
+            onSelected: onModeChanged == null
+                ? null
+                : (selected) {
+                    if (selected) {
+                      onModeChanged!(mode);
+                    }
+                  },
+          ),
+      ],
     );
   }
 }
@@ -344,5 +658,63 @@ class _ScannerOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ScannerOverlayPainter oldDelegate) {
     return oldDelegate.scanWindow != scanWindow;
+  }
+}
+
+class _ScannerErrorPanel extends StatelessWidget {
+  const _ScannerErrorPanel({
+    required this.message,
+    required this.primaryLabel,
+    required this.onPrimary,
+    this.secondaryLabel,
+    this.onSecondary,
+  });
+
+  final String message;
+  final String primaryLabel;
+  final Future<void> Function() onPrimary;
+  final String? secondaryLabel;
+  final Future<void> Function()? onSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.qr_code_scanner_outlined, size: 36),
+                  const SizedBox(height: 12),
+                  Text(message, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: onPrimary,
+                        child: Text(primaryLabel),
+                      ),
+                      if (secondaryLabel != null && onSecondary != null)
+                        OutlinedButton(
+                          onPressed: onSecondary,
+                          child: Text(secondaryLabel!),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

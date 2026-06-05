@@ -1,6 +1,6 @@
 # Implementation Status
 
-Status: v0.1 prototype started, updated 2026-06-03.
+Status: v0.1 prototype started, updated 2026-06-04.
 
 ## Built
 
@@ -20,10 +20,12 @@ Status: v0.1 prototype started, updated 2026-06-03.
   - NFC summary
   - compatibility status
   - favorite/archive
-- Local repository using `shared_preferences`.
+- Local repository using Drift / SQLite, with legacy `shared_preferences`
+  migration support for older installs.
 - Demo seed cards are development-only via `--dart-define=CARD_BOX_SEED_DEMOS=true`.
-- Plain JSON export/import with native backup file creation and file-picker
-  import, including portable photo attachments in backup files.
+- Plain JSON export/import with native backup file creation, native share-sheet
+  handoff, and file-picker import, including portable photo attachments in
+  backup files.
 - Encrypted backup export/import using a user password.
 - Camera/photo-library card image capture wired with local file storage.
 - Barcode/QR camera scanning wired.
@@ -54,6 +56,8 @@ Status: v0.1 prototype started, updated 2026-06-03.
   - compatibility test
   - export/import
 - Permission-first prototype messaging for camera, NFC, and file flows.
+- Native in-repo settings bridge for NFC settings handoff instead of relying on
+  `app_settings`.
 
 ## Verified
 
@@ -74,6 +78,8 @@ Status: v0.1 prototype started, updated 2026-06-03.
 - `nfc_manager` is vendored under `third_party/nfc_manager` and patched to use
   Flutter 3.44 built-in Kotlin support, removing the earlier KGP warning on
   Android builds.
+- `app_settings` has been removed and replaced with a small native settings
+  bridge on Android and iOS.
 - iOS deployment target is raised to `15.5` to match the OCR package
   requirement.
 - iOS Podfile now includes the Japanese ML Kit text-recognition package for the
@@ -81,6 +87,7 @@ Status: v0.1 prototype started, updated 2026-06-03.
 
 ## Not Yet Built
 
-- System share flow for backup files.
 - iOS NFC entitlement setup and validation.
 - Broader iOS-specific validation.
+- De-vendoring `mobile_scanner` and `nfc_manager` once upstream Android build
+  integration is fully aligned with the active Flutter toolchain.

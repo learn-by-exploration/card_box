@@ -15,6 +15,26 @@ class VisitingCardOcrService {
     r'(?:(?:\+?\d)[\d\s().-]{6,}\d)',
     caseSensitive: false,
   );
+  static final _contactFieldPrefixes = <String>[
+    'tel',
+    'phone',
+    'mobile',
+    'fax',
+    'email',
+    'e-mail',
+    'mail',
+    'web',
+    'website',
+    'url',
+    'address',
+    'add',
+    '電話',
+    '携帯',
+    'メール',
+    'mail',
+    '住所',
+    'fax',
+  ];
   static final _jobTitleKeywords = <String>[
     'manager',
     'director',
@@ -150,26 +170,23 @@ class VisitingCardOcrService {
     ).where((website) => !_looksLikeEmail(website)).toList();
     final phones = _extractPhones(normalizedLines);
 
-    final remainingLines = normalizedLines.where((line) {
-      final lower = line.toLowerCase();
-      if (_emailPattern.hasMatch(line) || _websitePattern.hasMatch(line)) {
-        return false;
-      }
-      if (_phonePattern.hasMatch(line) && !_looksLikeLikelyAddress(line)) {
-        return false;
-      }
-      if (lower.startsWith('tel') ||
-          lower.startsWith('fax') ||
-          lower.startsWith('mobile') ||
-          lower.startsWith('email') ||
-          lower.startsWith('web') ||
-          lower.startsWith('電話') ||
-          lower.startsWith('携帯') ||
-          lower.startsWith('mail')) {
-        return false;
-      }
-      return true;
-    }).toList();
+    final remainingLines = normalizedLines
+        .where((line) {
+          final lower = line.toLowerCase();
+          if (_emailPattern.hasMatch(line) || _websitePattern.hasMatch(line)) {
+            return false;
+          }
+          if (_phonePattern.hasMatch(line) && !_looksLikeLikelyAddress(line)) {
+            return false;
+          }
+          if (_hasFieldPrefix(lower)) {
+            return false;
+          }
+          return true;
+        })
+        .map(_stripFieldLabel)
+        .where((line) => line.isNotEmpty)
+        .toList();
 
     final suggestedName = _inferName(remainingLines);
     final suggestedCompany = _inferCompany(remainingLines, suggestedName);
@@ -254,9 +271,15 @@ class VisitingCardOcrService {
   List<String> _extractPhones(List<String> lines) {
     final seen = <String>{};
     for (final line in lines) {
+      if (line.toLowerCase().contains('fax')) {
+        continue;
+      }
       for (final match in _phonePattern.allMatches(line)) {
         final value = match.group(0)?.trim();
-        if (value == null || value.isEmpty || !_looksLikePhone(value)) {
+        if (value == null ||
+            value.isEmpty ||
+            !_looksLikePhone(value) ||
+            _looksLikeLikelyAddress(line)) {
           continue;
         }
         seen.add(value);
@@ -266,48 +289,75 @@ class VisitingCardOcrService {
   }
 
   String _inferName(List<String> lines) {
-    for (final line in lines.take(5)) {
-      final words = line.split(RegExp(r'\s+'));
-      if (words.length > 5) {
-        continue;
-      }
-      if (RegExp(r'\d').hasMatch(line)) {
-        continue;
-      }
-      final lower = line.toLowerCase();
-      if (_jobTitleKeywords.any(lower.contains) ||
-          _companyKeywords.any(lower.contains)) {
-        continue;
-      }
-      return line;
-    }
-    return '';
+    return _bestScoredLine(
+      lines: lines.take(6).toList(),
+      scorer: (line, index) {
+        final lower = line.toLowerCase();
+        final words = line.split(RegExp(r'\s+'));
+        var score = 0;
+        if (index == 0) {
+          score += 4;
+        }
+        if (!RegExp(r'\d').hasMatch(line)) {
+          score += 3;
+        }
+        if (words.length >= 2 && words.length <= 4) {
+          score += 4;
+        }
+        if (_looksLikePersonName(line)) {
+          score += 4;
+        }
+        if (_jobTitleKeywords.any(lower.contains)) {
+          score -= 6;
+        }
+        if (_companyKeywords.any(lower.contains)) {
+          score -= 6;
+        }
+        if (_looksLikeLikelyAddress(line)) {
+          score -= 8;
+        }
+        if (_hasFieldPrefix(lower)) {
+          score -= 8;
+        }
+        return score;
+      },
+      minimumScore: 5,
+    );
   }
 
   String _inferCompany(List<String> lines, String suggestedName) {
-    for (final line in lines.take(8)) {
-      if (line == suggestedName) {
-        continue;
-      }
-      final lower = line.toLowerCase();
-      if (_companyKeywords.any(lower.contains)) {
-        return line;
-      }
-    }
-    for (final line in lines.take(8)) {
-      if (line == suggestedName) {
-        continue;
-      }
-      final lower = line.toLowerCase();
-      if (_jobTitleKeywords.any(lower.contains) ||
-          _looksLikeLikelyAddress(line)) {
-        continue;
-      }
-      if (!RegExp(r'\d').hasMatch(line) && line.length > 4) {
-        return line;
-      }
-    }
-    return '';
+    return _bestScoredLine(
+      lines: lines.take(8).where((line) => line != suggestedName).toList(),
+      scorer: (line, index) {
+        final lower = line.toLowerCase();
+        var score = 0;
+        if (index <= 2) {
+          score += 2;
+        }
+        if (_companyKeywords.any(lower.contains)) {
+          score += 8;
+        }
+        if (!_jobTitleKeywords.any(lower.contains) &&
+            !_looksLikeLikelyAddress(line) &&
+            !RegExp(r'\d').hasMatch(line)) {
+          score += 3;
+        }
+        if (line.length >= 5) {
+          score += 1;
+        }
+        if (_looksLikePersonName(line)) {
+          score -= 7;
+        }
+        if (_jobTitleKeywords.any(lower.contains)) {
+          score -= 5;
+        }
+        if (_hasFieldPrefix(lower) || _looksLikeLikelyAddress(line)) {
+          score -= 7;
+        }
+        return score;
+      },
+      minimumScore: 3,
+    );
   }
 
   String _inferTitle(
@@ -315,20 +365,44 @@ class VisitingCardOcrService {
     String suggestedName,
     String suggestedCompany,
   ) {
-    for (final line in lines.take(8)) {
-      if (line == suggestedName || line == suggestedCompany) {
-        continue;
-      }
-      final lower = line.toLowerCase();
-      if (_jobTitleKeywords.any(lower.contains)) {
-        return line;
-      }
+    final title = _bestScoredLine(
+      lines: lines
+          .take(8)
+          .where((line) => line != suggestedName && line != suggestedCompany)
+          .toList(),
+      scorer: (line, index) {
+        final lower = line.toLowerCase();
+        var score = 0;
+        if (_jobTitleKeywords.any(lower.contains)) {
+          score += 8;
+        }
+        if (!RegExp(r'\d').hasMatch(line) && line.length <= 32) {
+          score += 2;
+        }
+        if (index <= 2) {
+          score += 1;
+        }
+        if (_companyKeywords.any(lower.contains)) {
+          score -= 3;
+        }
+        if (_looksLikeLikelyAddress(line) || _hasFieldPrefix(lower)) {
+          score -= 6;
+        }
+        return score;
+      },
+      minimumScore: 4,
+    );
+    if (title.isNotEmpty) {
+      return title;
     }
     if (suggestedName.isNotEmpty && suggestedCompany.isNotEmpty) {
       final start = lines.indexOf(suggestedName);
       final end = lines.indexOf(suggestedCompany);
       if (start != -1 && end != -1 && end > start + 1) {
-        return lines[start + 1];
+        final between = _stripFieldLabel(lines[start + 1]);
+        if (between.isNotEmpty && !_looksLikeLikelyAddress(between)) {
+          return between;
+        }
       }
     }
     return '';
@@ -370,6 +444,66 @@ class VisitingCardOcrService {
         line.contains('大阪府') ||
         line.contains('京都府') ||
         line.contains('北海道') ||
-        RegExp(r'\d{3}-\d{4}').hasMatch(line);
+        RegExp(r'^(?:〒\s*)?\d{3}-\d{4}(?!-\d)').hasMatch(line);
+  }
+
+  bool _hasFieldPrefix(String lower) {
+    return _contactFieldPrefixes.any(
+      (prefix) =>
+          lower.startsWith('$prefix:') ||
+          lower.startsWith('$prefix ') ||
+          lower.startsWith('$prefix.'),
+    );
+  }
+
+  String _stripFieldLabel(String line) {
+    var value = line.trim();
+    for (final prefix in _contactFieldPrefixes) {
+      final pattern = RegExp(
+        '^${RegExp.escape(prefix)}\\s*[:：.-]?\\s*',
+        caseSensitive: false,
+      );
+      value = value.replaceFirst(pattern, '');
+    }
+    return value.trim();
+  }
+
+  bool _looksLikePersonName(String line) {
+    final compact = line.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.isEmpty || compact.length > 40) {
+      return false;
+    }
+    if (RegExp(r'\d').hasMatch(compact)) {
+      return false;
+    }
+    if (compact.contains('@') || compact.contains('http')) {
+      return false;
+    }
+    final words = compact.split(' ');
+    if (words.length >= 2 && words.length <= 4) {
+      return true;
+    }
+    return RegExp(r'^[A-Za-z\u3040-\u30ff\u3400-\u9fff・ ]+$').hasMatch(compact);
+  }
+
+  String _bestScoredLine({
+    required List<String> lines,
+    required int Function(String line, int index) scorer,
+    required int minimumScore,
+  }) {
+    var bestScore = minimumScore - 1;
+    var bestLine = '';
+    for (var index = 0; index < lines.length; index += 1) {
+      final candidate = _stripFieldLabel(lines[index]);
+      if (candidate.isEmpty) {
+        continue;
+      }
+      final score = scorer(candidate, index);
+      if (score > bestScore) {
+        bestScore = score;
+        bestLine = candidate;
+      }
+    }
+    return bestLine;
   }
 }

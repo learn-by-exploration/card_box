@@ -4,10 +4,10 @@ Card Box is a proposed free, open-source mobile app for organizing the cards
 people carry every day: RFID/NFC cards, loyalty cards, membership cards, ID
 cards, access cards, gift cards, and barcode/QR based passes.
 
-This workspace is starting with requirements and system engineering artifacts
-before implementation. The intended development model is V-model: each
-requirement should eventually map to architecture, implementation, and a
-verification method.
+This workspace follows a V-model development path: requirements map to
+architecture, implementation, and verification. The app now includes a working
+Android-first Flutter prototype plus the system-engineering artifacts that
+guided it.
 
 ## Current Direction
 
@@ -35,3 +35,4 @@ verification method.
 - [Implementation status](docs/v_model/implementation_status.md)
 - [Research notes](docs/research/initial_research.md)
 - [Open questions](docs/v_model/open_questions.md)
+- [Android device acceptance](docs/testing/android_device_acceptance.md)

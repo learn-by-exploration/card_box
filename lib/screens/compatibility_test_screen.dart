@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:app_settings/app_settings.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 
 import 'package:card_box/models/compatibility_status.dart';
@@ -7,6 +6,7 @@ import 'package:card_box/models/nfc_scan_result.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/device_settings_service.dart';
 import 'package:card_box/services/nfc_service.dart';
 
 class CompatibilityTestScreen extends StatefulWidget {
@@ -31,6 +31,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   CompatibilityStatus _selectedStatus = CompatibilityStatus.untested;
   final _summaryController = TextEditingController();
   final _nfcService = NfcService();
+  final _deviceSettingsService = const DeviceSettingsService();
   NfcAvailability? _availability;
   bool _loadingAvailability = true;
   bool _scanning = false;
@@ -191,6 +192,16 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
         return;
       }
       _applyResult(result);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final result = NfcScanResult(
+        status: CompatibilityStatus.unsupported,
+        summary: 'The NFC session could not be started.',
+        detail: 'Error: $error',
+      );
+      _applyResult(result);
     } finally {
       widget.appLockService.endTrustedExternalFlow();
       if (mounted) {
@@ -235,9 +246,14 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   Future<void> _openNfcSettings() async {
     try {
       widget.appLockService.beginTrustedExternalFlow();
-      await AppSettings.openAppSettingsPanel(AppSettingsPanelType.nfc);
-    } catch (_) {
-      await AppSettings.openAppSettings(type: AppSettingsType.nfc);
+      final opened = await _deviceSettingsService.openNfcSettings();
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open NFC settings on this device.'),
+          ),
+        );
+      }
     } finally {
       widget.appLockService.endTrustedExternalFlow();
       await _loadAvailability();

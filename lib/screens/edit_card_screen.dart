@@ -1,18 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:card_box/models/add_card_preset.dart';
 import 'package:card_box/models/card_category.dart';
 import 'package:card_box/models/card_type.dart';
 import 'package:card_box/models/compatibility_status.dart';
+import 'package:card_box/models/recovered_media_draft.dart';
 import 'package:card_box/models/scanned_code.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/barcode_scan_screen.dart';
 import 'package:card_box/screens/card_image_viewer_screen.dart';
 import 'package:card_box/screens/visiting_card_review_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
+import 'package:card_box/services/card_media_exception.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/card_media_service.dart';
+import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/visiting_card_ocr_service.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
@@ -21,14 +26,20 @@ class EditCardScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.mediaRecoveryService,
     this.existingCard,
     this.preset = AddCardPreset.general,
+    this.recoveredMediaDraft,
+    this.autoStartFrontScan = false,
   });
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final MediaRecoveryService mediaRecoveryService;
   final WalletCard? existingCard;
   final AddCardPreset preset;
+  final RecoveredMediaDraft? recoveredMediaDraft;
+  final bool autoStartFrontScan;
 
   @override
   State<EditCardScreen> createState() => _EditCardScreenState();
@@ -63,14 +74,20 @@ class _EditCardScreenState extends State<EditCardScreen> {
   bool _busyBackCapture = false;
   bool _extractingDetails = false;
   bool _saved = false;
+  bool _didScheduleAutoFrontScan = false;
 
   @override
   void initState() {
     super.initState();
     final card = widget.existingCard;
-    _draftCardId = card?.id ?? 'draft-${DateTime.now().microsecondsSinceEpoch}';
+    _draftCardId =
+        widget.recoveredMediaDraft?.draftCardId ??
+        card?.id ??
+        'draft-${DateTime.now().microsecondsSinceEpoch}';
     if (card == null) {
       _applyPreset();
+      _applyRecoveredMediaDraft();
+      _scheduleAutoFrontScanIfNeeded();
       return;
     }
     _nameController.text = card.name;
@@ -91,6 +108,8 @@ class _EditCardScreenState extends State<EditCardScreen> {
     _contactWebsitesController.text = card.contactWebsites.join('\n');
     _contactAddressController.text = card.contactAddress;
     _rawOcrText = card.rawOcrText;
+    _applyRecoveredMediaDraft();
+    _scheduleAutoFrontScanIfNeeded();
   }
 
   @override
@@ -189,7 +208,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
             _PermissionNote(
               icon: Icons.photo_camera,
               text:
-                  'For the cleanest card image, start with Scan card. You can still fall back to the camera or choose an existing image.',
+                  'For the cleanest card image, start with Smart scan. You can still fall back to the camera or choose an existing image.',
             ),
             const SizedBox(height: 12),
             _PhotoEditor(
@@ -298,37 +317,39 @@ class _EditCardScreenState extends State<EditCardScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 18),
-            _PermissionNote(
-              icon: Icons.qr_code_scanner,
-              text:
-                  'Barcode and QR scanning asks before using the camera. Manual entry still works when scanning is not practical.',
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: _startBarcodeScanFlow,
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan code'),
+            if (_cardType != CardType.visitingCard) ...[
+              const SizedBox(height: 18),
+              _PermissionNote(
+                icon: Icons.qr_code_scanner,
+                text:
+                    'Barcode and QR scanning asks before using the camera. Manual entry still works when scanning is not practical.',
               ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _barcodePayloadController,
-              decoration: const InputDecoration(
-                labelText: 'Barcode/QR payload',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: _startBarcodeScanFlow,
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('Scan code'),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _barcodeFormatController,
-              decoration: const InputDecoration(
-                labelText: 'Barcode/QR format',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _barcodePayloadController,
+                decoration: const InputDecoration(
+                  labelText: 'Barcode/QR payload',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _barcodeFormatController,
+                decoration: const InputDecoration(
+                  labelText: 'Barcode/QR format',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,
@@ -491,6 +512,12 @@ class _EditCardScreenState extends State<EditCardScreen> {
       }
     });
     try {
+      await widget.mediaRecoveryService.markPendingPhotoRequest(
+        draftCardId: _draftCardId,
+        preset: widget.preset,
+        side: side,
+        existingCardId: widget.existingCard?.id,
+      );
       final path = fromCamera
           ? await _mediaService.capturePhoto(cardId: _draftCardId, side: side)
           : await _mediaService.selectPhoto(cardId: _draftCardId, side: side);
@@ -507,6 +534,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
         }
       });
     } finally {
+      await widget.mediaRecoveryService.clearPendingPhotoRequest();
       if (mounted) {
         setState(() {
           if (side == 'front') {
@@ -520,12 +548,42 @@ class _EditCardScreenState extends State<EditCardScreen> {
     }
   }
 
+  void _applyRecoveredMediaDraft() {
+    final recovered = widget.recoveredMediaDraft;
+    if (recovered == null) {
+      return;
+    }
+    if (recovered.frontImagePath.isNotEmpty) {
+      _frontImagePath = recovered.frontImagePath;
+    }
+    if (recovered.backImagePath.isNotEmpty) {
+      _backImagePath = recovered.backImagePath;
+    }
+  }
+
+  void _scheduleAutoFrontScanIfNeeded() {
+    if (_didScheduleAutoFrontScan ||
+        !widget.autoStartFrontScan ||
+        widget.existingCard != null ||
+        _cardType != CardType.visitingCard ||
+        _frontImagePath.isNotEmpty) {
+      return;
+    }
+    _didScheduleAutoFrontScan = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_startScanFlow(side: 'front'));
+    });
+  }
+
   Future<void> _startScanFlow({required String side}) async {
     final approved = await _confirmInterfaceUse(
-      title: 'Scan card with edge detection?',
+      title: 'Use smart card scan?',
       message:
-          'Card Box will open a card scanning interface and try to capture a cleaner, flatter image of the $side of this card.',
-      actionLabel: 'Start scan',
+          'Card Box will open the guided card scanner for the $side of this card. If that scanner is unavailable on this device, Card Box will fall back to the camera and let you crop the image before saving it.',
+      actionLabel: 'Start smart scan',
     );
     if (!approved) {
       return;
@@ -543,23 +601,49 @@ class _EditCardScreenState extends State<EditCardScreen> {
       }
     });
     try {
-      final path = await _mediaService.scanCardPhoto(
+      await widget.mediaRecoveryService.markPendingPhotoRequest(
+        draftCardId: _draftCardId,
+        preset: widget.preset,
+        side: side,
+        existingCardId: widget.existingCard?.id,
+      );
+      final result = await _mediaService.scanCardPhoto(
         cardId: _draftCardId,
         side: side,
       );
-      if (path == null || !mounted) {
+      if (result == null || !mounted) {
         return;
       }
       final previousPath = side == 'front' ? _frontImagePath : _backImagePath;
       await _deleteIfTemporary(previousPath, side: side);
       setState(() {
         if (side == 'front') {
-          _frontImagePath = path;
+          _frontImagePath = result.path;
         } else {
-          _backImagePath = path;
+          _backImagePath = result.path;
         }
       });
+      final notice = result.noticeMessage?.trim();
+      if (notice != null && notice.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(notice)));
+      }
+    } on CardMediaException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          action: SnackBarAction(
+            label: 'Use camera',
+            onPressed: () => _pickPhoto(side: side, fromCamera: true),
+          ),
+        ),
+      );
     } finally {
+      await widget.mediaRecoveryService.clearPendingPhotoRequest();
       if (mounted) {
         setState(() {
           if (side == 'front') {
@@ -636,6 +720,19 @@ class _EditCardScreenState extends State<EditCardScreen> {
           _backImagePath = editedPath;
         }
       });
+    } on CardMediaException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          action: SnackBarAction(
+            label: 'Choose again',
+            onPressed: () => _pickPhoto(side: side, fromCamera: false),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -803,7 +900,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
       futures.add(_mediaManager.deleteImage(_backImagePath));
     }
     if (futures.isNotEmpty) {
-      Future.wait(futures);
+      unawaited(Future.wait(futures));
     }
   }
 }
@@ -1036,7 +1133,7 @@ class _PhotoEditor extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: busy ? null : onScan,
                   icon: const Icon(Icons.document_scanner_outlined),
-                  label: Text(busy ? 'Opening...' : 'Scan card'),
+                  label: Text(busy ? 'Opening...' : 'Smart scan'),
                 ),
                 OutlinedButton.icon(
                   onPressed: busy ? null : onCapture,
