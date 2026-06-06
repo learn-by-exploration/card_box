@@ -3,14 +3,29 @@ import 'package:flutter/material.dart';
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
 
+enum CardTileLayout { list, grid }
+
 class CardTile extends StatelessWidget {
-  const CardTile({super.key, required this.card, required this.onTap});
+  const CardTile({
+    super.key,
+    required this.card,
+    required this.onTap,
+    this.layout = CardTileLayout.list,
+  });
 
   final WalletCard card;
   final VoidCallback onTap;
+  final CardTileLayout layout;
 
   @override
   Widget build(BuildContext context) {
+    return switch (layout) {
+      CardTileLayout.list => _buildListTile(context),
+      CardTileLayout.grid => _buildGridTile(context),
+    };
+  }
+
+  Widget _buildListTile(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Card(
       child: InkWell(
@@ -89,6 +104,73 @@ class CardTile extends StatelessWidget {
                     : card.isVisitingCard
                     ? Icons.contact_phone_outlined
                     : Icons.more_horiz,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridTile(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _iconForCard(),
+                      color: colors.onPrimaryContainer,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (card.favorite) const Icon(Icons.star, size: 18),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                card.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                card.issuer.isEmpty ? card.categoryLabel : card.issuer,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const Spacer(),
+              _MiniBadge(
+                label: _statusLabel(),
+                background: _statusBackground(colors),
+                foreground: _statusForeground(colors),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                card.hasBarcode
+                    ? 'Show code'
+                    : card.isVisitingCard
+                    ? 'Open contact'
+                    : 'Open card',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),

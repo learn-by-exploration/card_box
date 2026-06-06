@@ -13,6 +13,7 @@ import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/card_share_service.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/contact_action_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
@@ -169,6 +170,7 @@ class _ActionHeader extends StatelessWidget {
   final CardRepository repository;
   final AppLockService appLockService;
   final BackupFileService _fileService = const BackupFileService();
+  final CardShareService _cardShareService = const CardShareService();
   final ContactActionService _contactActionService =
       const ContactActionService();
   final VCardExportService _vCardExportService = const VCardExportService();
@@ -208,6 +210,13 @@ class _ActionHeader extends StatelessWidget {
                     label: const Text('Copy contact'),
                     onPressed: () => _copyContactBlock(context),
                   ),
+                FilledButton.icon(
+                  icon: const Icon(Icons.share_outlined),
+                  label: Text(
+                    card.isVisitingCard ? 'Share contact' : 'Share card',
+                  ),
+                  onPressed: () => _shareCard(context),
+                ),
                 if (card.isVisitingCard && card.contactPhones.isNotEmpty)
                   OutlinedButton.icon(
                     icon: const Icon(Icons.call_outlined),
@@ -337,6 +346,16 @@ class _ActionHeader extends StatelessWidget {
         context,
       ).showSnackBar(const SnackBar(content: Text('Contact details copied')));
     }
+  }
+
+  Future<void> _shareCard(BuildContext context) async {
+    final result = await _cardShareService.shareCard(card);
+    if (!context.mounted || result.message.isEmpty) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
   }
 
   Future<void> _exportVCard(BuildContext context) async {

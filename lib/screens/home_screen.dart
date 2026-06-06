@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:card_box/models/add_card_preset.dart';
 import 'package:card_box/models/card_category.dart';
@@ -16,6 +17,7 @@ import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/screens/export_import_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
+import 'package:card_box/services/card_share_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
@@ -46,9 +48,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _layoutPreferenceKey = 'card_box.home_layout.v1';
+
   String _query = '';
   String? _categoryKey;
   _BrowseMode _browseMode = _BrowseMode.cards;
+  _CardLayoutMode _layoutMode = _CardLayoutMode.list;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLayoutPreference();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +76,17 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: AppBar(
             title: const Text('Card Box'),
             actions: [
+              IconButton(
+                tooltip: _layoutMode == _CardLayoutMode.list
+                    ? 'Use grid view'
+                    : 'Use list view',
+                icon: Icon(
+                  _layoutMode == _CardLayoutMode.list
+                      ? Icons.grid_view_outlined
+                      : Icons.view_agenda_outlined,
+                ),
+                onPressed: _toggleLayoutMode,
+              ),
               PopupMenuButton<_HomeMenuAction>(
                 tooltip: 'More',
                 onSelected: _handleMenuAction,
@@ -240,13 +262,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         : 'Scan your first contact',
                   )
                 else ...[
-                  for (var index = 0; index < cards.length; index++) ...[
-                    CardTile(
-                      card: cards[index],
-                      onTap: () => _openCardActions(cards[index]),
-                    ),
-                    if (index != cards.length - 1) const SizedBox(height: 10),
-                  ],
+                  _CardCollection(
+                    cards: cards,
+                    layoutMode: _layoutMode,
+                    onTapCard: _openCardActions,
+                  ),
                 ],
               ],
             ),
@@ -267,6 +287,28 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _loadLayoutPreference() async {
+    final preferences = await SharedPreferences.getInstance();
+    final stored = preferences.getString(_layoutPreferenceKey);
+    if (!mounted || stored == null) {
+      return;
+    }
+    final match = _CardLayoutMode.values.where((mode) => mode.name == stored);
+    if (match.isEmpty) {
+      return;
+    }
+    setState(() => _layoutMode = match.first);
+  }
+
+  Future<void> _toggleLayoutMode() async {
+    final nextMode = _layoutMode == _CardLayoutMode.list
+        ? _CardLayoutMode.grid
+        : _CardLayoutMode.list;
+    setState(() => _layoutMode = nextMode);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_layoutPreferenceKey, nextMode.name);
   }
 
   void _openAddCard(AddCardPreset preset, {bool autoStartFrontScan = false}) {
@@ -449,6 +491,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                   ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.share_outlined),
+                  title: Text(
+                    card.isVisitingCard ? 'Share contact' : 'Share card',
+                  ),
+                  subtitle: Text(
+                    card.isVisitingCard
+                        ? 'Share a contact file through any messenger'
+                        : 'Share a card image or summary through any messenger',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _shareCard(card);
+                  },
+                ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.edit_outlined),
@@ -697,6 +755,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Future<void> _shareCard(WalletCard card) async {
+    final result = await const CardShareService().shareCard(card);
+    if (!mounted || result.message.isEmpty) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
 }
 
 class _RecoveredMediaCard extends StatelessWidget {
@@ -755,7 +823,61 @@ class _RecoveredMediaCard extends StatelessWidget {
 
 enum _BrowseMode { cards, contacts }
 
+enum _CardLayoutMode { list, grid }
+
 enum _HomeMenuAction { archived, summary, categories, backup, lock }
+
+class _CardCollection extends StatelessWidget {
+  const _CardCollection({
+    required this.cards,
+    required this.layoutMode,
+    required this.onTapCard,
+  });
+
+  final List<WalletCard> cards;
+  final _CardLayoutMode layoutMode;
+  final ValueChanged<WalletCard> onTapCard;
+
+  @override
+  Widget build(BuildContext context) {
+    if (layoutMode == _CardLayoutMode.list) {
+      return Column(
+        children: [
+          for (var index = 0; index < cards.length; index++) ...[
+            CardTile(card: cards[index], onTap: () => onTapCard(cards[index])),
+            if (index != cards.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      );
+    }
+
+    final width = MediaQuery.sizeOf(context).width;
+    final crossAxisCount = width >= 1100
+        ? 4
+        : width >= 820
+        ? 3
+        : 2;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: cards.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.98,
+      ),
+      itemBuilder: (context, index) {
+        final card = cards[index];
+        return CardTile(
+          card: card,
+          layout: CardTileLayout.grid,
+          onTap: () => onTapCard(card),
+        );
+      },
+    );
+  }
+}
 
 class _CompactOverviewPanel extends StatelessWidget {
   const _CompactOverviewPanel({required this.cards});
