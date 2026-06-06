@@ -10,12 +10,14 @@ import 'package:card_box/screens/app_lock_settings_screen.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
 import 'package:card_box/screens/card_reference_present_screen.dart';
+import 'package:card_box/screens/category_settings_screen.dart';
 import 'package:card_box/screens/compatibility_test_screen.dart';
 import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/screens/export_import_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/widgets/card_tile.dart';
 
@@ -24,6 +26,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.categoryService,
     required this.mediaRecoveryService,
     required this.onRecoveredMediaDiscarded,
     required this.onRecoveredMediaUsed,
@@ -32,6 +35,7 @@ class HomeScreen extends StatefulWidget {
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final CategoryService categoryService;
   final MediaRecoveryService mediaRecoveryService;
   final RecoveredMediaDraft? recoveredMediaDraft;
   final Future<void> Function() onRecoveredMediaDiscarded;
@@ -43,14 +47,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
-  CardCategory? _category;
-  _StatusFilter _statusFilter = _StatusFilter.all;
+  String? _categoryKey;
   _BrowseMode _browseMode = _BrowseMode.cards;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.repository,
+      animation: Listenable.merge([widget.repository, widget.categoryService]),
       builder: (context, _) {
         final allItems = widget.repository.cards;
         final archivedCount = widget.repository.archivedCards.length;
@@ -87,6 +90,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icon(Icons.space_dashboard_outlined, size: 18),
                         SizedBox(width: 10),
                         Text('Wallet summary'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: _HomeMenuAction.categories,
+                    child: Row(
+                      children: [
+                        Icon(Icons.category_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('Categories'),
                       ],
                     ),
                   ),
@@ -168,8 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       setState(() {
                         _browseMode = selection.first;
                         if (_browseMode == _BrowseMode.contacts) {
-                          _category = null;
-                          _statusFilter = _StatusFilter.all;
+                          _categoryKey = null;
                         }
                       });
                     },
@@ -187,58 +199,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (_browseMode == _BrowseMode.cards) ...[
                   SizedBox(
                     width: double.infinity,
-                    child: SegmentedButton<_StatusFilter>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: _StatusFilter.all,
-                          label: Text('All'),
-                        ),
-                        ButtonSegment(
-                          value: _StatusFilter.ready,
-                          label: Text('Ready'),
-                        ),
-                        ButtonSegment(
-                          value: _StatusFilter.needsTest,
-                          label: Text('Needs test'),
-                        ),
-                        ButtonSegment(
-                          value: _StatusFilter.reference,
-                          label: Text('Reference'),
-                        ),
-                      ],
-                      selected: {_statusFilter},
-                      onSelectionChanged: (selection) {
-                        setState(() => _statusFilter = selection.first);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: DropdownButtonFormField<CardCategory?>(
-                      initialValue: _category,
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: _categoryKey,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
                       ),
                       items: [
-                        const DropdownMenuItem<CardCategory?>(
+                        const DropdownMenuItem<String?>(
                           value: null,
                           child: Text('All categories'),
                         ),
-                        ...CardCategory.values
-                            .where(
-                              (category) => category != CardCategory.contact,
-                            )
-                            .map(
-                              (category) => DropdownMenuItem<CardCategory?>(
-                                value: category,
-                                child: Text(category.label),
-                              ),
-                            ),
+                        ..._categoryFilterEntries(allItems),
                       ],
-                      onChanged: (value) => setState(() => _category = value),
+                      onChanged: (value) =>
+                          setState(() => _categoryKey = value),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -258,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? 'No cards found'
                         : 'No contacts found',
                     body: _browseMode == _BrowseMode.cards
-                        ? 'Add a barcode card, NFC/RFID card, or a simple reference card with photos and notes.'
+                        ? 'Add a barcode card, NFC/RFID card, visiting card, or a simple reference card with photos and notes.'
                         : 'Scan a visiting card directly or add a contact card manually.',
                     buttonLabel: _browseMode == _BrowseMode.cards
                         ? 'Add your first card'
@@ -300,6 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => EditCardScreen(
           repository: widget.repository,
           appLockService: widget.appLockService,
+          categoryService: widget.categoryService,
           mediaRecoveryService: widget.mediaRecoveryService,
           preset: preset,
           autoStartFrontScan: autoStartFrontScan,
@@ -316,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => _AddOptionsSheet(
         title: 'How do you want to add it?',
         subtitle:
-            'Pick the path that matches the card you are holding. You can still edit everything afterward.',
+            'Pick the path that matches what you are holding. You can still edit everything afterward.',
         options: [
           _AddOption(
             icon: Icons.qr_code_2,
@@ -334,6 +310,15 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () {
               Navigator.of(context).pop();
               _openAddCard(AddCardPreset.nfc);
+            },
+          ),
+          _AddOption(
+            icon: Icons.contact_page_outlined,
+            title: 'Visiting card',
+            subtitle: 'Scan a business card or save it as a contact-style card',
+            onTap: () {
+              Navigator.of(context).pop();
+              _openAddCard(AddCardPreset.visiting, autoStartFrontScan: true);
             },
           ),
           _AddOption(
@@ -482,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         builder: (_) => EditCardScreen(
                           repository: widget.repository,
                           appLockService: widget.appLockService,
+                          categoryService: widget.categoryService,
                           mediaRecoveryService: widget.mediaRecoveryService,
                           existingCard: card,
                         ),
@@ -507,6 +493,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         builder: (_) => CardDetailScreen(
                           repository: widget.repository,
                           appLockService: widget.appLockService,
+                          categoryService: widget.categoryService,
                           cardId: card.id,
                         ),
                       ),
@@ -550,11 +537,21 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => ArchivedCardsScreen(
               repository: widget.repository,
               appLockService: widget.appLockService,
+              categoryService: widget.categoryService,
             ),
           ),
         );
       case _HomeMenuAction.summary:
         _showWalletSummary();
+      case _HomeMenuAction.categories:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CategorySettingsScreen(
+              categoryService: widget.categoryService,
+              repository: widget.repository,
+            ),
+          ),
+        );
       case _HomeMenuAction.backup:
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -583,20 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
       };
       final categoryMatches = _browseMode == _BrowseMode.contacts
           ? true
-          : _category == null || card.category == _category;
-      final statusMatches = _browseMode == _BrowseMode.contacts
-          ? true
-          : switch (_statusFilter) {
-              _StatusFilter.all => true,
-              _StatusFilter.ready =>
-                card.compatibilityStatus ==
-                        CompatibilityStatus.barcodeDisplayable ||
-                    card.compatibilityStatus == CompatibilityStatus.nfcReadable,
-              _StatusFilter.needsTest =>
-                card.compatibilityStatus == CompatibilityStatus.untested,
-              _StatusFilter.reference =>
-                card.compatibilityStatus == CompatibilityStatus.referenceOnly,
-            };
+          : _matchesSelectedCategory(card);
       final queryMatches =
           normalizedQuery.isEmpty ||
           [
@@ -612,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ...card.contactWebsites,
             card.rawOcrText,
           ].any((value) => value.toLowerCase().contains(normalizedQuery));
-      return browseMatches && categoryMatches && statusMatches && queryMatches;
+      return browseMatches && categoryMatches && queryMatches;
     }).toList();
     filtered.sort((a, b) {
       if (a.favorite != b.favorite) {
@@ -624,6 +608,47 @@ class _HomeScreenState extends State<HomeScreen> {
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
     return filtered;
+  }
+
+  bool _matchesSelectedCategory(WalletCard card) {
+    if (_categoryKey == null) {
+      return true;
+    }
+    if (_categoryKey!.startsWith('custom:')) {
+      final customLabel = _categoryKey!.substring('custom:'.length);
+      return card.category == CardCategory.other &&
+          card.customCategory?.trim().toLowerCase() ==
+              customLabel.toLowerCase();
+    }
+    return card.category.name == _categoryKey;
+  }
+
+  List<DropdownMenuItem<String?>> _categoryFilterEntries(
+    List<WalletCard> cards,
+  ) {
+    final customLabels = <String>{
+      ...widget.categoryService.customCategories,
+      ...cards
+          .where((card) => card.category == CardCategory.other)
+          .map((card) => card.customCategory?.trim() ?? '')
+          .where((label) => label.isNotEmpty),
+    }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return [
+      ...CardCategory.values
+          .where((category) => category != CardCategory.contact)
+          .map(
+            (category) => DropdownMenuItem<String?>(
+              value: category.name,
+              child: Text(category.label),
+            ),
+          ),
+      ...customLabels.map(
+        (label) => DropdownMenuItem<String?>(
+          value: 'custom:$label',
+          child: Text(label),
+        ),
+      ),
+    ];
   }
 
   Future<void> _dismissRecoveredMedia() async {
@@ -650,6 +675,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => EditCardScreen(
           repository: widget.repository,
           appLockService: widget.appLockService,
+          categoryService: widget.categoryService,
           mediaRecoveryService: widget.mediaRecoveryService,
           existingCard: existingCard,
           preset: draft.preset,
@@ -727,11 +753,9 @@ class _RecoveredMediaCard extends StatelessWidget {
   }
 }
 
-enum _StatusFilter { all, ready, needsTest, reference }
-
 enum _BrowseMode { cards, contacts }
 
-enum _HomeMenuAction { archived, summary, backup, lock }
+enum _HomeMenuAction { archived, summary, categories, backup, lock }
 
 class _CompactOverviewPanel extends StatelessWidget {
   const _CompactOverviewPanel({required this.cards});

@@ -5,6 +5,7 @@ import 'package:card_box/screens/app_lock_screen.dart';
 import 'package:card_box/screens/home_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 
 class AppRoot extends StatefulWidget {
@@ -12,12 +13,14 @@ class AppRoot extends StatefulWidget {
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.categoryService,
     required this.mediaRecoveryService,
     this.recoveredMediaDraft,
   });
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final CategoryService categoryService;
   final MediaRecoveryService mediaRecoveryService;
   final RecoveredMediaDraft? recoveredMediaDraft;
 
@@ -68,7 +71,11 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([widget.repository, widget.appLockService]),
+      animation: Listenable.merge([
+        widget.repository,
+        widget.appLockService,
+        widget.categoryService,
+      ]),
       builder: (context, _) {
         final appLock = widget.appLockService;
         if (!appLock.ready) {
@@ -81,6 +88,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
             : HomeScreen(
                 repository: widget.repository,
                 appLockService: widget.appLockService,
+                categoryService: widget.categoryService,
                 mediaRecoveryService: widget.mediaRecoveryService,
                 recoveredMediaDraft: _recoveredMediaDraft,
                 onRecoveredMediaUsed: _clearRecoveredMedia,

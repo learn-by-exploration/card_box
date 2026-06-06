@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:card_box/models/wallet_card.dart';
 
 class CardStorageCodec {
-  static const currentSchemaVersion = 3;
+  static const currentSchemaVersion = 5;
   static const storageFormat = 'card_box_storage';
   static const backupFormat = 'card_box_plain_json';
 
@@ -116,6 +116,8 @@ class CardStorageCodec {
       cardMaps = switch (version) {
         1 => cardMaps.map(_migrateCardV1toV2).toList(),
         2 => cardMaps.map(_migrateCardV2toV3).toList(),
+        3 => cardMaps.map(_migrateCardV3toV4).toList(),
+        4 => cardMaps.map(_migrateCardV4toV5).toList(),
         _ => cardMaps,
       };
     }
@@ -183,6 +185,30 @@ class CardStorageCodec {
     );
     migrated['contactAddress'] =
         _nonEmptyString(migrated['contactAddress']) ?? '';
+    return migrated;
+  }
+
+  Map<String, Object?> _migrateCardV3toV4(Map<String, Object?> source) {
+    final migrated = Map<String, Object?>.from(source);
+    migrated['barcodeDisplayValue'] =
+        _nonEmptyString(migrated['barcodeDisplayValue']) ?? '';
+    migrated['barcodeValueType'] =
+        _nonEmptyString(migrated['barcodeValueType']) ?? '';
+    migrated['barcodeStructuredData'] =
+        _nonEmptyString(migrated['barcodeStructuredData']) ?? '';
+    migrated['barcodeRawBytesHex'] =
+        _nonEmptyString(migrated['barcodeRawBytesHex']) ?? '';
+    migrated['barcodeCapturedAt'] = _nonEmptyString(
+      migrated['barcodeCapturedAt'],
+    );
+    return migrated;
+  }
+
+  Map<String, Object?> _migrateCardV4toV5(Map<String, Object?> source) {
+    final migrated = Map<String, Object?>.from(source);
+    migrated['barcodeImagePath'] = _normalizeLegacyImagePath(
+      _nonEmptyString(migrated['barcodeImagePath']) ?? '',
+    );
     return migrated;
   }
 

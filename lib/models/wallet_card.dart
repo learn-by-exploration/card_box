@@ -18,6 +18,12 @@ class WalletCard {
     this.backImagePath = '',
     this.barcodePayload = '',
     this.barcodeFormat = '',
+    this.barcodeImagePath = '',
+    this.barcodeDisplayValue = '',
+    this.barcodeValueType = '',
+    this.barcodeStructuredData = '',
+    this.barcodeRawBytesHex = '',
+    this.barcodeCapturedAt,
     this.nfcTagSummary = '',
     this.compatibilityStatus = CompatibilityStatus.untested,
     this.cardType = CardType.standard,
@@ -43,6 +49,12 @@ class WalletCard {
   final String backImagePath;
   final String barcodePayload;
   final String barcodeFormat;
+  final String barcodeImagePath;
+  final String barcodeDisplayValue;
+  final String barcodeValueType;
+  final String barcodeStructuredData;
+  final String barcodeRawBytesHex;
+  final DateTime? barcodeCapturedAt;
   final String nfcTagSummary;
   final CompatibilityStatus compatibilityStatus;
   final CardType cardType;
@@ -64,6 +76,13 @@ class WalletCard {
   }
 
   bool get hasBarcode => barcodePayload.trim().isNotEmpty;
+  bool get hasBarcodeDetails =>
+      barcodeDisplayValue.trim().isNotEmpty ||
+      barcodeValueType.trim().isNotEmpty ||
+      barcodeStructuredData.trim().isNotEmpty ||
+      barcodeRawBytesHex.trim().isNotEmpty ||
+      barcodeCapturedAt != null;
+  bool get hasBarcodeImage => barcodeImagePath.trim().isNotEmpty;
   bool get hasPhotos =>
       frontImagePath.trim().isNotEmpty || backImagePath.trim().isNotEmpty;
   bool get isVisitingCard => cardType == CardType.visitingCard;
@@ -82,6 +101,7 @@ class WalletCard {
     String? issuer,
     CardCategory? category,
     String? customCategory,
+    bool clearCustomCategory = false,
     String? notes,
     DateTime? expiryDate,
     bool clearExpiryDate = false,
@@ -91,6 +111,13 @@ class WalletCard {
     String? backImagePath,
     String? barcodePayload,
     String? barcodeFormat,
+    String? barcodeImagePath,
+    String? barcodeDisplayValue,
+    String? barcodeValueType,
+    String? barcodeStructuredData,
+    String? barcodeRawBytesHex,
+    DateTime? barcodeCapturedAt,
+    bool clearBarcodeCapturedAt = false,
     String? nfcTagSummary,
     CompatibilityStatus? compatibilityStatus,
     CardType? cardType,
@@ -108,7 +135,9 @@ class WalletCard {
       name: name ?? this.name,
       issuer: issuer ?? this.issuer,
       category: category ?? this.category,
-      customCategory: customCategory ?? this.customCategory,
+      customCategory: clearCustomCategory
+          ? null
+          : customCategory ?? this.customCategory,
       notes: notes ?? this.notes,
       expiryDate: clearExpiryDate ? null : expiryDate ?? this.expiryDate,
       favorite: favorite ?? this.favorite,
@@ -117,6 +146,15 @@ class WalletCard {
       backImagePath: backImagePath ?? this.backImagePath,
       barcodePayload: barcodePayload ?? this.barcodePayload,
       barcodeFormat: barcodeFormat ?? this.barcodeFormat,
+      barcodeImagePath: barcodeImagePath ?? this.barcodeImagePath,
+      barcodeDisplayValue: barcodeDisplayValue ?? this.barcodeDisplayValue,
+      barcodeValueType: barcodeValueType ?? this.barcodeValueType,
+      barcodeStructuredData:
+          barcodeStructuredData ?? this.barcodeStructuredData,
+      barcodeRawBytesHex: barcodeRawBytesHex ?? this.barcodeRawBytesHex,
+      barcodeCapturedAt: clearBarcodeCapturedAt
+          ? null
+          : barcodeCapturedAt ?? this.barcodeCapturedAt,
       nfcTagSummary: nfcTagSummary ?? this.nfcTagSummary,
       compatibilityStatus: compatibilityStatus ?? this.compatibilityStatus,
       cardType: cardType ?? this.cardType,
@@ -146,6 +184,12 @@ class WalletCard {
       'backImagePath': backImagePath,
       'barcodePayload': barcodePayload,
       'barcodeFormat': barcodeFormat,
+      'barcodeImagePath': barcodeImagePath,
+      'barcodeDisplayValue': barcodeDisplayValue,
+      'barcodeValueType': barcodeValueType,
+      'barcodeStructuredData': barcodeStructuredData,
+      'barcodeRawBytesHex': barcodeRawBytesHex,
+      'barcodeCapturedAt': barcodeCapturedAt?.toIso8601String(),
       'nfcTagSummary': nfcTagSummary,
       'compatibilityStatus': compatibilityStatus.name,
       'cardType': cardType.name,
@@ -175,6 +219,12 @@ class WalletCard {
       backImagePath: json['backImagePath'] as String? ?? '',
       barcodePayload: json['barcodePayload'] as String? ?? '',
       barcodeFormat: json['barcodeFormat'] as String? ?? '',
+      barcodeImagePath: json['barcodeImagePath'] as String? ?? '',
+      barcodeDisplayValue: json['barcodeDisplayValue'] as String? ?? '',
+      barcodeValueType: json['barcodeValueType'] as String? ?? '',
+      barcodeStructuredData: json['barcodeStructuredData'] as String? ?? '',
+      barcodeRawBytesHex: json['barcodeRawBytesHex'] as String? ?? '',
+      barcodeCapturedAt: _parseDate(json['barcodeCapturedAt']),
       nfcTagSummary: json['nfcTagSummary'] as String? ?? '',
       compatibilityStatus: CompatibilityStatus.fromName(
         json['compatibilityStatus'] as String? ?? '',

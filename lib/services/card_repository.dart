@@ -147,6 +147,54 @@ class CardRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<int> migrateCustomCategory({
+    required String fromLabel,
+    required CardCategory toCategory,
+    String? toCustomCategory,
+  }) async {
+    final source = fromLabel.trim();
+    final targetCustom = toCustomCategory?.trim() ?? '';
+    if (source.isEmpty) {
+      return 0;
+    }
+    if (toCategory == CardCategory.other && targetCustom.isEmpty) {
+      throw ArgumentError(
+        'A target custom category is required when migrating to Other.',
+      );
+    }
+    final migratingToSameCustom =
+        toCategory == CardCategory.other &&
+        source.toLowerCase() == targetCustom.toLowerCase();
+    if (migratingToSameCustom) {
+      return 0;
+    }
+
+    final now = DateTime.now();
+    final updatedCards = <WalletCard>[];
+    for (var index = 0; index < _cards.length; index++) {
+      final card = _cards[index];
+      if (card.category != CardCategory.other ||
+          card.customCategory?.trim().toLowerCase() != source.toLowerCase()) {
+        continue;
+      }
+      final updated = card.copyWith(
+        category: toCategory,
+        customCategory: toCategory == CardCategory.other ? targetCustom : null,
+        clearCustomCategory: toCategory != CardCategory.other,
+        updatedAt: now,
+      );
+      _cards[index] = updated;
+      updatedCards.add(updated);
+    }
+
+    if (updatedCards.isEmpty) {
+      return 0;
+    }
+    await _database.upsertCards(updatedCards);
+    notifyListeners();
+    return updatedCards.length;
+  }
+
   Future<String> exportPlainJson() async {
     final images = <BackupImagePayload>[];
     for (final card in _cards) {
@@ -165,6 +213,14 @@ class CardRepository extends ChangeNotifier {
       );
       if (backImage != null) {
         images.add(backImage);
+      }
+      final barcodeImage = await _imageAttachmentFor(
+        path: card.barcodeImagePath,
+        cardId: card.id,
+        side: 'barcode',
+      );
+      if (barcodeImage != null) {
+        images.add(barcodeImage);
       }
     }
     return _storageCodec.encodeBackupWithImages(
@@ -278,7 +334,17 @@ class CardRepository extends ChangeNotifier {
       fallbackPath: card.backImagePath,
       attachments: attachments,
     );
-    return card.copyWith(frontImagePath: frontPath, backImagePath: backPath);
+    final barcodeImagePath = await _importOrResolveImagePath(
+      cardId: card.id,
+      side: 'barcode',
+      fallbackPath: card.barcodeImagePath,
+      attachments: attachments,
+    );
+    return card.copyWith(
+      frontImagePath: frontPath,
+      backImagePath: backPath,
+      barcodeImagePath: barcodeImagePath,
+    );
   }
 
   Future<String> _importOrResolveImagePath({
@@ -322,11 +388,16 @@ class CardRepository extends ChangeNotifier {
         previous.backImagePath != next.backImagePath) {
       await _mediaManager.deleteImage(previous.backImagePath);
     }
+    if (previous.barcodeImagePath.isNotEmpty &&
+        previous.barcodeImagePath != next.barcodeImagePath) {
+      await _mediaManager.deleteImage(previous.barcodeImagePath);
+    }
   }
 
   Future<void> _cleanupCardImages(WalletCard card) async {
     await _mediaManager.deleteImage(card.frontImagePath);
     await _mediaManager.deleteImage(card.backImagePath);
+    await _mediaManager.deleteImage(card.barcodeImagePath);
   }
 
   List<WalletCard> _demoCards() {

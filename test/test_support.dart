@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_database.dart';
 import 'package:card_box/services/card_media_manager.dart';
+import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/device_auth_service.dart';
 import 'package:card_box/services/secure_store.dart';
 
@@ -159,6 +160,27 @@ Future<AppLockService> createReadyAppLockService({
     secureStore: store,
     deviceAuthService: auth,
   );
+  await service.init();
+  return service;
+}
+
+Future<CategoryService> createReadyCategoryService({
+  SharedPreferences? preferences,
+  List<String> customCategories = const <String>[],
+}) async {
+  if (preferences == null) {
+    SharedPreferences.setMockInitialValues({
+      'card_box.custom_categories.v1': customCategories,
+    });
+  }
+  final prefs = preferences ?? await SharedPreferences.getInstance();
+  if (preferences != null) {
+    await prefs.setStringList(
+      'card_box.custom_categories.v1',
+      customCategories,
+    );
+  }
+  final service = CategoryService(preferences: prefs);
   await service.init();
   return service;
 }

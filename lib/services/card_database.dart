@@ -21,7 +21,8 @@ class CardRecords extends Table {
 
   TextColumn get customCategoryText => text().nullable()();
 
-  TextColumn get cardTypeName => text().withDefault(const Constant('standard'))();
+  TextColumn get cardTypeName =>
+      text().withDefault(const Constant('standard'))();
 
   TextColumn get compatibilityStatusName =>
       text().withDefault(const Constant('untested'))();
@@ -169,6 +170,11 @@ class CardDatabase extends _$CardDatabase {
       card.notes,
       card.barcodePayload,
       card.barcodeFormat,
+      card.barcodeImagePath,
+      card.barcodeDisplayValue,
+      card.barcodeValueType,
+      card.barcodeStructuredData,
+      card.barcodeRawBytesHex,
       card.nfcTagSummary,
       card.rawOcrText,
       card.contactTitle,

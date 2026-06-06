@@ -17,6 +17,7 @@ import 'package:card_box/services/card_media_exception.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/card_media_service.dart';
+import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/visiting_card_ocr_service.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
@@ -26,6 +27,7 @@ class EditCardScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.categoryService,
     required this.mediaRecoveryService,
     this.existingCard,
     this.preset = AddCardPreset.general,
@@ -35,6 +37,7 @@ class EditCardScreen extends StatefulWidget {
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final CategoryService categoryService;
   final MediaRecoveryService mediaRecoveryService;
   final WalletCard? existingCard;
   final AddCardPreset preset;
@@ -63,13 +66,23 @@ class _EditCardScreenState extends State<EditCardScreen> {
   final _visitingCardOcrService = VisitingCardOcrService();
 
   CardCategory _category = CardCategory.loyalty;
+  String _selectedCategoryKey = CardCategory.loyalty.name;
   CardType _cardType = CardType.standard;
   late String _draftCardId;
   String _frontImagePath = '';
   String _backImagePath = '';
+  String _barcodeImagePath = '';
   String _initialFrontImagePath = '';
   String _initialBackImagePath = '';
+  String _initialBarcodeImagePath = '';
   String _rawOcrText = '';
+  String _barcodeDisplayValue = '';
+  String _barcodeValueType = '';
+  String _barcodeStructuredData = '';
+  String _barcodeRawBytesHex = '';
+  DateTime? _barcodeCapturedAt;
+  String _barcodeMetadataPayload = '';
+  String _barcodeMetadataFormat = '';
   bool _busyFrontCapture = false;
   bool _busyBackCapture = false;
   bool _extractingDetails = false;
@@ -79,6 +92,8 @@ class _EditCardScreenState extends State<EditCardScreen> {
   @override
   void initState() {
     super.initState();
+    _barcodePayloadController.addListener(_handleBarcodeFieldsEdited);
+    _barcodeFormatController.addListener(_handleBarcodeFieldsEdited);
     final card = widget.existingCard;
     _draftCardId =
         widget.recoveredMediaDraft?.draftCardId ??
@@ -96,11 +111,21 @@ class _EditCardScreenState extends State<EditCardScreen> {
     _notesController.text = card.notes;
     _frontImagePath = card.frontImagePath;
     _backImagePath = card.backImagePath;
+    _barcodeImagePath = card.barcodeImagePath;
     _initialFrontImagePath = card.frontImagePath;
     _initialBackImagePath = card.backImagePath;
+    _initialBarcodeImagePath = card.barcodeImagePath;
     _barcodePayloadController.text = card.barcodePayload;
     _barcodeFormatController.text = card.barcodeFormat;
+    _barcodeDisplayValue = card.barcodeDisplayValue;
+    _barcodeValueType = card.barcodeValueType;
+    _barcodeStructuredData = card.barcodeStructuredData;
+    _barcodeRawBytesHex = card.barcodeRawBytesHex;
+    _barcodeCapturedAt = card.barcodeCapturedAt;
+    _barcodeMetadataPayload = card.barcodePayload.trim();
+    _barcodeMetadataFormat = card.barcodeFormat.trim();
     _category = card.category;
+    _selectedCategoryKey = _categorySelectionKeyForCard(card);
     _cardType = card.cardType;
     _contactTitleController.text = card.contactTitle;
     _contactPhonesController.text = card.contactPhones.join('\n');
@@ -177,22 +202,14 @@ class _EditCardScreenState extends State<EditCardScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<CardCategory>(
-              initialValue: _category,
+            DropdownButtonFormField<String>(
+              initialValue: _selectedCategoryKey,
               decoration: const InputDecoration(
                 labelText: 'Category',
                 border: OutlineInputBorder(),
               ),
-              items: CardCategory.values
-                  .map(
-                    (category) => DropdownMenuItem(
-                      value: category,
-                      child: Text(category.label),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) =>
-                  setState(() => _category = value ?? CardCategory.other),
+              items: _categoryEntries(),
+              onChanged: _handleCategorySelected,
             ),
             if (_category == CardCategory.other) ...[
               const SizedBox(height: 12),
@@ -202,6 +219,15 @@ class _EditCardScreenState extends State<EditCardScreen> {
                   labelText: 'Custom category',
                   border: OutlineInputBorder(),
                 ),
+                validator: (value) {
+                  if (_category != CardCategory.other) {
+                    return null;
+                  }
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter a custom category';
+                  }
+                  return null;
+                },
               ),
             ],
             const SizedBox(height: 18),
@@ -338,6 +364,8 @@ class _EditCardScreenState extends State<EditCardScreen> {
                 controller: _barcodePayloadController,
                 decoration: const InputDecoration(
                   labelText: 'Barcode/QR payload',
+                  helperText:
+                      'A card can keep this visible code together with photos and NFC details.',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -349,6 +377,37 @@ class _EditCardScreenState extends State<EditCardScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              if (_hasStoredCodeMetadata) ...[
+                const SizedBox(height: 12),
+                _MetadataHintCard(
+                  title: 'Stored code details',
+                  lines: [
+                    if (_barcodeDisplayValue.trim().isNotEmpty)
+                      'Display value: ${_barcodeDisplayValue.trim()}',
+                    if (_barcodeValueType.trim().isNotEmpty)
+                      'Detected type: ${_humanizeBarcodeValueType(_barcodeValueType)}',
+                    if (_barcodeStructuredData.trim().isNotEmpty)
+                      'Structured details captured',
+                    if (_barcodeRawBytesHex.trim().isNotEmpty)
+                      'Raw bytes captured',
+                    if (_barcodeCapturedAt != null)
+                      'Scanned: ${_barcodeCapturedAt!.toLocal()}',
+                  ],
+                ),
+                if (_barcodeImagePath.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _PhotoEditor(
+                    title: 'Stored code image',
+                    imagePath: _barcodeImagePath,
+                    busy: false,
+                    onScan: null,
+                    onCapture: null,
+                    onLibrary: null,
+                    onEdit: null,
+                    onClear: null,
+                  ),
+                ],
+              ],
             ],
             const SizedBox(height: 12),
             TextFormField(
@@ -376,6 +435,12 @@ class _EditCardScreenState extends State<EditCardScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    final customCategory = _category == CardCategory.other
+        ? _customCategoryController.text.trim()
+        : '';
+    if (customCategory.isNotEmpty) {
+      await widget.categoryService.addCategory(customCategory);
+    }
     final existing = widget.existingCard;
     final now = DateTime.now();
     final hasBarcode = _barcodePayloadController.text.trim().isNotEmpty;
@@ -388,14 +453,18 @@ class _EditCardScreenState extends State<EditCardScreen> {
       name: _nameController.text.trim(),
       issuer: _issuerController.text.trim(),
       category: _category,
-      customCategory: _category == CardCategory.other
-          ? _customCategoryController.text.trim()
-          : null,
+      customCategory: customCategory.isEmpty ? null : customCategory,
       notes: _notesController.text.trim(),
       frontImagePath: _frontImagePath,
       backImagePath: _backImagePath,
+      barcodeImagePath: _barcodeImagePath,
       barcodePayload: _barcodePayloadController.text.trim(),
       barcodeFormat: _barcodeFormatController.text.trim(),
+      barcodeDisplayValue: _barcodeDisplayValue,
+      barcodeValueType: _barcodeValueType,
+      barcodeStructuredData: _barcodeStructuredData,
+      barcodeRawBytesHex: _barcodeRawBytesHex,
+      barcodeCapturedAt: _barcodeCapturedAt,
       compatibilityStatus: nextStatus,
       nfcTagSummary: existing?.nfcTagSummary ?? '',
       cardType: _cardType,
@@ -684,9 +753,28 @@ class _EditCardScreenState extends State<EditCardScreen> {
       return;
     }
     final scannedCode = result;
+    final previousBarcodeImagePath = _barcodeImagePath;
+    var nextBarcodeImagePath = '';
+    if (scannedCode.imageBytes != null && scannedCode.imageBytes!.isNotEmpty) {
+      nextBarcodeImagePath = await _mediaManager.storeImportedImage(
+        cardId: _draftCardId,
+        side: 'barcode',
+        bytes: scannedCode.imageBytes!,
+        extension: '.jpg',
+      );
+    }
+    await _deleteIfTemporary(previousBarcodeImagePath, side: 'barcode');
     setState(() {
       _barcodePayloadController.text = scannedCode.payload;
       _barcodeFormatController.text = _formatLabel(scannedCode.format);
+      _barcodeImagePath = nextBarcodeImagePath;
+      _barcodeDisplayValue = scannedCode.displayValue.trim();
+      _barcodeValueType = scannedCode.valueType.trim();
+      _barcodeStructuredData = scannedCode.structuredData.trim();
+      _barcodeRawBytesHex = scannedCode.rawBytesHex.trim();
+      _barcodeCapturedAt = scannedCode.capturedAt;
+      _barcodeMetadataPayload = scannedCode.payload.trim();
+      _barcodeMetadataFormat = _formatLabel(scannedCode.format).trim();
     });
   }
 
@@ -801,30 +889,91 @@ class _EditCardScreenState extends State<EditCardScreen> {
       case AddCardPreset.general:
         _cardType = CardType.standard;
         _category = CardCategory.loyalty;
+        _selectedCategoryKey = CardCategory.loyalty.name;
         return;
       case AddCardPreset.barcode:
         _cardType = CardType.standard;
         _category = CardCategory.loyalty;
+        _selectedCategoryKey = CardCategory.loyalty.name;
         return;
       case AddCardPreset.nfc:
         _cardType = CardType.standard;
         _category = CardCategory.access;
+        _selectedCategoryKey = CardCategory.access.name;
         _notesController.text =
             'Use Compatibility test after saving to try NFC reading.';
         return;
       case AddCardPreset.reference:
         _cardType = CardType.standard;
         _category = CardCategory.id;
+        _selectedCategoryKey = CardCategory.id.name;
         _notesController.text =
             'Reference card: save photos and notes even if the phone cannot read it.';
         return;
       case AddCardPreset.visiting:
         _cardType = CardType.visitingCard;
         _category = CardCategory.contact;
+        _selectedCategoryKey = CardCategory.contact.name;
         _notesController.text =
             'Scan the card, extract likely contact details, and review them before saving.';
         return;
     }
+  }
+
+  String _categorySelectionKeyForCard(WalletCard card) {
+    if (card.category == CardCategory.other &&
+        card.customCategory?.trim().isNotEmpty == true) {
+      return 'custom:${card.customCategory!.trim()}';
+    }
+    return card.category.name;
+  }
+
+  List<DropdownMenuItem<String>> _categoryEntries() {
+    final customLabels = <String>{
+      ...widget.categoryService.customCategories,
+      if (_customCategoryController.text.trim().isNotEmpty)
+        _customCategoryController.text.trim(),
+    }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return [
+      ...CardCategory.values.map(
+        (category) => DropdownMenuItem<String>(
+          value: category.name,
+          child: Text(category.label),
+        ),
+      ),
+      ...customLabels.map(
+        (label) => DropdownMenuItem<String>(
+          value: 'custom:$label',
+          child: Text(label),
+        ),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'custom:new',
+        child: Text('Create custom category'),
+      ),
+    ];
+  }
+
+  void _handleCategorySelected(String? value) {
+    if (value == null) {
+      return;
+    }
+    setState(() {
+      _selectedCategoryKey = value;
+      if (value == 'custom:new') {
+        _category = CardCategory.other;
+        if (_customCategoryController.text.trim().isEmpty) {
+          _customCategoryController.clear();
+        }
+        return;
+      }
+      if (value.startsWith('custom:')) {
+        _category = CardCategory.other;
+        _customCategoryController.text = value.substring('custom:'.length);
+        return;
+      }
+      _category = CardCategory.fromName(value);
+    });
   }
 
   CompatibilityStatus _nextCompatibilityStatus({
@@ -863,6 +1012,58 @@ class _EditCardScreenState extends State<EditCardScreen> {
         .toList();
   }
 
+  bool get _hasStoredCodeMetadata =>
+      _barcodeImagePath.trim().isNotEmpty ||
+      _barcodeDisplayValue.trim().isNotEmpty ||
+      _barcodeValueType.trim().isNotEmpty ||
+      _barcodeStructuredData.trim().isNotEmpty ||
+      _barcodeRawBytesHex.trim().isNotEmpty ||
+      _barcodeCapturedAt != null;
+
+  void _handleBarcodeFieldsEdited() {
+    if (!_hasStoredCodeMetadata) {
+      _barcodeMetadataPayload = _barcodePayloadController.text.trim();
+      _barcodeMetadataFormat = _barcodeFormatController.text.trim();
+      return;
+    }
+    if (_barcodePayloadController.text.trim() == _barcodeMetadataPayload &&
+        _barcodeFormatController.text.trim() == _barcodeMetadataFormat) {
+      return;
+    }
+    final previousBarcodeImagePath = _barcodeImagePath;
+    setState(() {
+      _barcodeDisplayValue = '';
+      _barcodeValueType = '';
+      _barcodeStructuredData = '';
+      _barcodeRawBytesHex = '';
+      _barcodeCapturedAt = null;
+      _barcodeImagePath = '';
+      _barcodeMetadataPayload = _barcodePayloadController.text.trim();
+      _barcodeMetadataFormat = _barcodeFormatController.text.trim();
+    });
+    unawaited(_deleteIfTemporary(previousBarcodeImagePath, side: 'barcode'));
+  }
+
+  String _humanizeBarcodeValueType(String valueType) {
+    final normalized = valueType.trim();
+    if (normalized.isEmpty) {
+      return 'Unknown';
+    }
+    return normalized
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
+
   Future<void> _clearPhoto({required String side}) async {
     final currentPath = side == 'front' ? _frontImagePath : _backImagePath;
     await _deleteIfTemporary(currentPath, side: side);
@@ -882,9 +1083,12 @@ class _EditCardScreenState extends State<EditCardScreen> {
     if (path.isEmpty) {
       return;
     }
-    final initialPath = side == 'front'
-        ? _initialFrontImagePath
-        : _initialBackImagePath;
+    final initialPath = switch (side) {
+      'front' => _initialFrontImagePath,
+      'back' => _initialBackImagePath,
+      'barcode' => _initialBarcodeImagePath,
+      _ => '',
+    };
     if (path != initialPath) {
       await _mediaManager.deleteImage(path);
     }
@@ -898,6 +1102,10 @@ class _EditCardScreenState extends State<EditCardScreen> {
     }
     if (_backImagePath.isNotEmpty && _backImagePath != _initialBackImagePath) {
       futures.add(_mediaManager.deleteImage(_backImagePath));
+    }
+    if (_barcodeImagePath.isNotEmpty &&
+        _barcodeImagePath != _initialBarcodeImagePath) {
+      futures.add(_mediaManager.deleteImage(_barcodeImagePath));
     }
     if (futures.isNotEmpty) {
       unawaited(Future.wait(futures));
@@ -920,6 +1128,34 @@ class _PermissionNote extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
       ],
+    );
+  }
+}
+
+class _MetadataHintCard extends StatelessWidget {
+  const _MetadataHintCard({required this.title, required this.lines});
+
+  final String title;
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            for (final line in lines)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(line),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1036,9 +1272,9 @@ class _PhotoEditor extends StatelessWidget {
     required this.title,
     required this.imagePath,
     required this.busy,
-    required this.onScan,
-    required this.onCapture,
-    required this.onLibrary,
+    this.onScan,
+    this.onCapture,
+    this.onLibrary,
     this.onEdit,
     this.onClear,
   });
@@ -1046,9 +1282,9 @@ class _PhotoEditor extends StatelessWidget {
   final String title;
   final String imagePath;
   final bool busy;
-  final VoidCallback onScan;
-  final VoidCallback onCapture;
-  final VoidCallback onLibrary;
+  final VoidCallback? onScan;
+  final VoidCallback? onCapture;
+  final VoidCallback? onLibrary;
   final VoidCallback? onEdit;
   final VoidCallback? onClear;
 
@@ -1130,21 +1366,24 @@ class _PhotoEditor extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                FilledButton.icon(
-                  onPressed: busy ? null : onScan,
-                  icon: const Icon(Icons.document_scanner_outlined),
-                  label: Text(busy ? 'Opening...' : 'Smart scan'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: busy ? null : onCapture,
-                  icon: const Icon(Icons.photo_camera),
-                  label: const Text('Use camera'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: busy ? null : onLibrary,
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Choose photo'),
-                ),
+                if (onScan != null)
+                  FilledButton.icon(
+                    onPressed: busy ? null : onScan,
+                    icon: const Icon(Icons.document_scanner_outlined),
+                    label: Text(busy ? 'Opening...' : 'Smart scan'),
+                  ),
+                if (onCapture != null)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : onCapture,
+                    icon: const Icon(Icons.photo_camera),
+                    label: const Text('Use camera'),
+                  ),
+                if (onLibrary != null)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : onLibrary,
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Choose photo'),
+                  ),
                 if (onEdit != null)
                   OutlinedButton.icon(
                     onPressed: busy ? null : onEdit,

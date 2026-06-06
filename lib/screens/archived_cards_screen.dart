@@ -4,16 +4,19 @@ import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/category_service.dart';
 
 class ArchivedCardsScreen extends StatelessWidget {
   const ArchivedCardsScreen({
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.categoryService,
   });
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final CategoryService categoryService;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +47,7 @@ class ArchivedCardsScreen extends StatelessWidget {
                           builder: (_) => CardDetailScreen(
                             repository: repository,
                             appLockService: appLockService,
+                            categoryService: categoryService,
                             cardId: card.id,
                           ),
                         ),

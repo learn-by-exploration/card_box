@@ -16,6 +16,7 @@ import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 
 import 'test_support.dart';
@@ -234,6 +235,143 @@ void main() {
         expect(repository.findById('same-card')!.notes, 'keep me');
       },
     );
+
+    test('backup preserves scanned barcode image attachments', () async {
+      SharedPreferences.setMockInitialValues({});
+      final mediaManager = FakeCardMediaManager();
+      mediaManager.seedImage(
+        '/images/code.jpg',
+        StoredImageBackupData(
+          bytes: Uint8List.fromList([7, 8, 9, 10]),
+          extension: '.jpg',
+        ),
+      );
+      final repository = CardRepository(
+        database: createInMemoryDatabase(),
+        mediaManager: mediaManager,
+      );
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'code-card',
+          name: 'Store card',
+          category: CardCategory.loyalty,
+          barcodePayload: 'STORE-123',
+          barcodeFormat: 'QRCode',
+          barcodeImagePath: '/images/code.jpg',
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
+
+      final exported = await repository.exportPlainJson();
+
+      final importedMediaManager = FakeCardMediaManager();
+      final importedRepository = CardRepository(
+        database: createInMemoryDatabase(),
+        mediaManager: importedMediaManager,
+      );
+      await importedRepository.init();
+      final result = await importedRepository.importPlainJsonProtected(
+        exported,
+      );
+
+      expect(result.importedCount, 1);
+      expect(
+        importedRepository.findById('code-card')!.barcodeImagePath,
+        '/imported/code-card_barcode.jpg',
+      );
+      expect(
+        importedMediaManager.importedPaths,
+        contains('/imported/code-card_barcode.jpg'),
+      );
+    });
+
+    test('migrates custom-category cards into a built-in category', () async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'club-1',
+          name: 'Court pass',
+          category: CardCategory.other,
+          customCategory: 'Sports Club',
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
+      await repository.upsert(
+        WalletCard(
+          id: 'club-2',
+          name: 'Archived club card',
+          category: CardCategory.other,
+          customCategory: 'Sports Club',
+          archived: true,
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
+
+      final movedCount = await repository.migrateCustomCategory(
+        fromLabel: 'Sports Club',
+        toCategory: CardCategory.membership,
+      );
+
+      expect(movedCount, 2);
+      expect(repository.findById('club-1')!.category, CardCategory.membership);
+      expect(repository.findById('club-1')!.customCategory, isNull);
+      expect(repository.findById('club-2')!.category, CardCategory.membership);
+      expect(repository.findById('club-2')!.archived, isTrue);
+    });
+  });
+
+  group('CategoryService', () {
+    test('adds, sorts, persists, and removes custom categories', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final service = CategoryService(preferences: prefs);
+      await service.init();
+
+      expect(await service.addCategory('Sports Club'), isTrue);
+      expect(await service.addCategory('  sports   club  '), isFalse);
+      expect(await service.addCategory('Basketball'), isTrue);
+      expect(service.customCategories, ['Basketball', 'Sports Club']);
+      expect(service.containsCategory('Sports Club'), isTrue);
+
+      final reloaded = CategoryService(preferences: prefs);
+      await reloaded.init();
+      expect(reloaded.customCategories, ['Basketball', 'Sports Club']);
+
+      expect(await reloaded.removeCategory('Sports Club'), isTrue);
+      expect(reloaded.customCategories, ['Basketball']);
+      expect(await reloaded.removeCategory('Missing'), isFalse);
+    });
+
+    test('renames a custom category and rejects collisions', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final service = CategoryService(preferences: prefs);
+      await service.init();
+      await service.addCategory('Sports Club');
+      await service.addCategory('Team');
+
+      expect(
+        await service.renameCategory(
+          fromLabel: 'Sports Club',
+          toLabel: 'Basketball Club',
+        ),
+        isTrue,
+      );
+      expect(service.customCategories, ['Basketball Club', 'Team']);
+      expect(
+        await service.renameCategory(
+          fromLabel: 'Basketball Club',
+          toLabel: 'Team',
+        ),
+        isFalse,
+      );
+    });
   });
 
   group('BackupFileService', () {

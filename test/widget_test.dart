@@ -23,6 +23,7 @@ import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/secure_store.dart';
 import 'package:card_box/services/vcard_export_service.dart';
 import 'package:card_box/services/visiting_card_ocr_service.dart';
+import 'package:card_box/services/category_service.dart';
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -473,10 +474,13 @@ void main() {
     await appLockService.init();
 
     final mediaRecoveryService = MediaRecoveryService(preferences: preferences);
+    final categoryService = CategoryService(preferences: preferences);
+    await categoryService.init();
     await tester.pumpWidget(
       CardBoxApp(
         repository: repository,
         appLockService: appLockService,
+        categoryService: categoryService,
         mediaRecoveryService: mediaRecoveryService,
       ),
     );

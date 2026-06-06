@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -40,6 +41,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
   String? _scannerErrorMessage;
   String? _candidatePayload;
   String? _candidateFormat;
+  ScannedCode? _pendingCode;
   String? _lastSeenPayload;
   int _stableHits = 0;
 
@@ -256,6 +258,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       detectionTimeoutMs: mode == _ScanMode.qr ? 250 : 400,
       autoZoom: false,
       formats: _formatsForMode(mode),
+      returnImage: true,
     );
   }
 
@@ -335,6 +338,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _scannerGeneration += 1;
       _candidatePayload = null;
       _candidateFormat = null;
+      _pendingCode = null;
       _lastSeenPayload = null;
       _stableHits = 0;
       _scannerErrorMessage = null;
@@ -389,6 +393,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
     setState(() {
       _candidatePayload = rawValue;
       _candidateFormat = barcode.format.name;
+      _pendingCode = _buildScannedCode(barcode, rawValue, capture.image);
       _stableHits = 0;
       _lastSeenPayload = null;
     });
@@ -404,6 +409,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       );
       _candidatePayload = null;
       _candidateFormat = null;
+      _pendingCode = null;
       _lastSeenPayload = null;
       _stableHits = 0;
     });
@@ -470,16 +476,13 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
   }
 
   void _confirmCandidate() {
-    if (_didReturnResult || _candidatePayload == null) {
+    if (_didReturnResult || _candidatePayload == null || _pendingCode == null) {
       return;
     }
     _didReturnResult = true;
     _resumeScannerAfterSettings = false;
     _resumeScannerAfterBackground = false;
-    final result = ScannedCode(
-      payload: _candidatePayload!,
-      format: _candidateFormat ?? 'unknown',
-    );
+    final result = _pendingCode!;
     unawaited(_closeScannerWithResult(result));
   }
 
@@ -488,6 +491,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _scannerErrorMessage = null;
       _candidatePayload = null;
       _candidateFormat = null;
+      _pendingCode = null;
       _lastSeenPayload = null;
       _stableHits = 0;
     });
@@ -502,6 +506,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _scannerErrorMessage = null;
       _candidatePayload = null;
       _candidateFormat = null;
+      _pendingCode = null;
       _lastSeenPayload = null;
       _stableHits = 0;
     });
@@ -514,11 +519,139 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _scannerErrorMessage = null;
       _candidatePayload = null;
       _candidateFormat = null;
+      _pendingCode = null;
       _lastSeenPayload = null;
       _stableHits = 0;
     });
     await Future<void>.delayed(Duration.zero);
     await _startScanner();
+  }
+
+  ScannedCode _buildScannedCode(
+    Barcode barcode,
+    String rawValue,
+    Uint8List? imageBytes,
+  ) {
+    return ScannedCode(
+      payload: rawValue,
+      format: barcode.format.name,
+      displayValue: (barcode.displayValue ?? '').trim(),
+      valueType: barcode.type.name,
+      structuredData: _structuredSummaryForBarcode(barcode),
+      rawBytesHex: _hexBytesForBarcode(barcode),
+      capturedAt: DateTime.now(),
+      imageBytes: imageBytes,
+    );
+  }
+
+  String _structuredSummaryForBarcode(Barcode barcode) {
+    final lines = <String>[];
+    if (barcode.url != null) {
+      lines.add('URL: ${barcode.url!.url}');
+      final title = barcode.url!.title?.trim();
+      if (title != null && title.isNotEmpty) {
+        lines.add('Title: $title');
+      }
+    }
+    if (barcode.phone?.number?.trim().isNotEmpty == true) {
+      lines.add('Phone: ${barcode.phone!.number!.trim()}');
+    }
+    if (barcode.email != null) {
+      final address = barcode.email!.address?.trim();
+      final subject = barcode.email!.subject?.trim();
+      final body = barcode.email!.body?.trim();
+      if (address != null && address.isNotEmpty) {
+        lines.add('Email: $address');
+      }
+      if (subject != null && subject.isNotEmpty) {
+        lines.add('Subject: $subject');
+      }
+      if (body != null && body.isNotEmpty) {
+        lines.add('Body: $body');
+      }
+    }
+    if (barcode.sms != null) {
+      lines.add('SMS number: ${barcode.sms!.phoneNumber}');
+      final message = barcode.sms!.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        lines.add('SMS message: $message');
+      }
+    }
+    if (barcode.wifi != null) {
+      final ssid = barcode.wifi!.ssid?.trim();
+      if (ssid != null && ssid.isNotEmpty) {
+        lines.add('Wi-Fi SSID: $ssid');
+      }
+      final password = barcode.wifi!.password?.trim();
+      if (password != null && password.isNotEmpty) {
+        lines.add('Wi-Fi password stored');
+      }
+      lines.add('Wi-Fi encryption: ${barcode.wifi!.encryptionType.name}');
+    }
+    if (barcode.contactInfo != null) {
+      final contact = barcode.contactInfo!;
+      final fullName = contact.name?.formattedName?.trim();
+      if (fullName != null && fullName.isNotEmpty) {
+        lines.add('Contact: $fullName');
+      }
+      final organization = contact.organization?.trim();
+      if (organization != null && organization.isNotEmpty) {
+        lines.add('Organization: $organization');
+      }
+      final title = contact.title?.trim();
+      if (title != null && title.isNotEmpty) {
+        lines.add('Title: $title');
+      }
+      for (final phone in contact.phones) {
+        final number = phone.number?.trim();
+        if (number != null && number.isNotEmpty) {
+          lines.add('Phone: $number');
+        }
+      }
+      for (final email in contact.emails) {
+        final address = email.address?.trim();
+        if (address != null && address.isNotEmpty) {
+          lines.add('Email: $address');
+        }
+      }
+      for (final url in contact.urls) {
+        final trimmed = url.trim();
+        if (trimmed.isNotEmpty) {
+          lines.add('URL: $trimmed');
+        }
+      }
+    }
+    if (barcode.calendarEvent != null) {
+      final event = barcode.calendarEvent!;
+      final summary = event.summary?.trim();
+      if (summary != null && summary.isNotEmpty) {
+        lines.add('Event: $summary');
+      }
+      final location = event.location?.trim();
+      if (location != null && location.isNotEmpty) {
+        lines.add('Location: $location');
+      }
+    }
+    return lines.join('\n');
+  }
+
+  String _hexBytesForBarcode(Barcode barcode) {
+    final raw = barcode.rawDecodedBytes;
+    Uint8List? bytes;
+    switch (raw) {
+      case DecodedBarcodeBytes():
+        bytes = raw.bytes;
+      case DecodedVisionBarcodeBytes():
+        bytes = raw.bytes ?? raw.rawBytes;
+      case null:
+        bytes = null;
+    }
+    if (bytes == null || bytes.isEmpty) {
+      return '';
+    }
+    return bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join(' ');
   }
 
   Future<void> _startScanner({bool restart = false}) async {

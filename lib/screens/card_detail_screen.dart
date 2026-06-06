@@ -13,6 +13,7 @@ import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/contact_action_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/vcard_export_service.dart';
@@ -24,11 +25,13 @@ class CardDetailScreen extends StatelessWidget {
     super.key,
     required this.repository,
     required this.appLockService,
+    required this.categoryService,
     required this.cardId,
   });
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final CategoryService categoryService;
   final String cardId;
 
   @override
@@ -65,6 +68,7 @@ class CardDetailScreen extends StatelessWidget {
                       builder: (_) => EditCardScreen(
                         repository: repository,
                         appLockService: appLockService,
+                        categoryService: categoryService,
                         mediaRecoveryService: recoveryService,
                         existingCard: card,
                       ),
@@ -296,6 +300,10 @@ class _ActionHeader extends StatelessWidget {
   String _summaryText() {
     if (card.isVisitingCard) {
       return 'This visiting card keeps the original scan and the contact details together. Open Edit any time to re-extract or refine the saved fields.';
+    }
+    final hasNfcSummary = card.nfcTagSummary.trim().isNotEmpty;
+    if (card.hasBarcode && hasNfcSummary) {
+      return 'This card keeps its visible code and NFC/RFID notes together, so you can present the code and still keep the wireless summary for reference.';
     }
     if (card.hasBarcode) {
       return 'This card is ready to be shown on screen, and you can still test NFC/RFID compatibility if needed.';
@@ -636,10 +644,73 @@ class _BarcodePanel extends StatelessWidget {
                   ? 'Barcode/QR payload'
                   : card.barcodeFormat,
             ),
+            if (card.barcodeImagePath.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CardImageViewerScreen(
+                      imagePath: card.barcodeImagePath,
+                      title: '${card.name} • Stored code image',
+                    ),
+                  ),
+                ),
+                child: AspectRatio(
+                  aspectRatio: 1.8,
+                  child: StoredCardImage(
+                    path: card.barcodeImagePath,
+                    emptyLabel: 'Stored code image',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ],
+            if (card.hasBarcodeDetails) ...[
+              const SizedBox(height: 12),
+              if (card.barcodeDisplayValue.trim().isNotEmpty)
+                _InfoRow(
+                  label: 'Display value',
+                  value: card.barcodeDisplayValue,
+                ),
+              if (card.barcodeValueType.trim().isNotEmpty)
+                _InfoRow(
+                  label: 'Detected type',
+                  value: _humanize(card.barcodeValueType),
+                ),
+              if (card.barcodeStructuredData.trim().isNotEmpty)
+                _InfoRow(
+                  label: 'Structured details',
+                  value: card.barcodeStructuredData,
+                ),
+              if (card.barcodeRawBytesHex.trim().isNotEmpty)
+                _InfoRow(label: 'Raw bytes', value: card.barcodeRawBytesHex),
+              if (card.barcodeCapturedAt != null)
+                _InfoRow(
+                  label: 'Captured',
+                  value: card.barcodeCapturedAt!.toLocal().toString(),
+                ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _humanize(String value) {
+    return value
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
   }
 }
 
@@ -656,6 +727,7 @@ class _InfoPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _InfoRow(label: 'Interfaces', value: _interfaceSummary(card)),
             _InfoRow(label: 'Category', value: card.categoryLabel),
             _buildInfoRow(
               context,
@@ -727,6 +799,19 @@ class _InfoPanel extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _interfaceSummary(WalletCard card) {
+    final interfaces = <String>[
+      if (card.hasPhotos) 'front/back photos',
+      if (card.hasBarcode) 'visible code',
+      if (card.hasBarcodeImage) 'code image',
+      if (card.nfcTagSummary.trim().isNotEmpty) 'NFC/RFID notes',
+    ];
+    if (interfaces.isEmpty) {
+      return 'Basic card record';
+    }
+    return interfaces.join(', ');
   }
 
   Widget _buildInfoRow(

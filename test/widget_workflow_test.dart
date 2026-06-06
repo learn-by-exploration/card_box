@@ -23,9 +23,7 @@ void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
   group('HomeScreen', () {
-    testWidgets('search, status filter, and category filter work together', (
-      tester,
-    ) async {
+    testWidgets('search and category filter work together', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       SharedPreferences.setMockInitialValues({});
@@ -69,6 +67,9 @@ void main() {
         ),
       );
       final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+      );
       final mediaRecoveryService = MediaRecoveryService(preferences: prefs);
 
       await tester.pumpWidget(
@@ -76,6 +77,7 @@ void main() {
           HomeScreen(
             repository: repository,
             appLockService: appLockService,
+            categoryService: categoryService,
             mediaRecoveryService: mediaRecoveryService,
             onRecoveredMediaDiscarded: () async {},
             onRecoveredMediaUsed: () {},
@@ -95,13 +97,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cards'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Ready'));
-      await tester.pumpAndSettle();
       expect(find.text('Library card'), findsOneWidget);
       expect(find.text('Aiko Tanaka'), findsNothing);
-      expect(find.text('Office badge'), findsNothing);
+      expect(find.text('Office badge'), findsOneWidget);
 
-      await tester.tap(find.byType(DropdownButtonFormField<CardCategory?>));
+      await tester.tap(find.byType(DropdownButtonFormField<String?>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Library').last);
       await tester.pumpAndSettle();
@@ -132,12 +132,16 @@ void main() {
         ),
       );
       final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+      );
 
       await tester.pumpWidget(
         wrapForTest(
           HomeScreen(
             repository: repository,
             appLockService: appLockService,
+            categoryService: categoryService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
             onRecoveredMediaDiscarded: () async {},
             onRecoveredMediaUsed: () {},
@@ -163,6 +167,9 @@ void main() {
       final repository = CardRepository(database: createInMemoryDatabase());
       await repository.init();
       final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+      );
       var discarded = false;
 
       await tester.pumpWidget(
@@ -170,6 +177,7 @@ void main() {
           HomeScreen(
             repository: repository,
             appLockService: appLockService,
+            categoryService: categoryService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
             recoveredMediaDraft: const RecoveredMediaDraft(
               draftCardId: 'draft-1',
@@ -190,6 +198,39 @@ void main() {
       expect(discarded, isTrue);
       expect(find.text('Recovered photo discarded.'), findsOneWidget);
     });
+
+    testWidgets('custom categories appear in the card filter', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+        customCategories: const ['Sports Club'],
+      );
+
+      await tester.pumpWidget(
+        wrapForTest(
+          HomeScreen(
+            repository: repository,
+            appLockService: appLockService,
+            categoryService: categoryService,
+            mediaRecoveryService: MediaRecoveryService(preferences: prefs),
+            onRecoveredMediaDiscarded: () async {},
+            onRecoveredMediaUsed: () {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<String?>));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sports Club'), findsOneWidget);
+      expect(find.text('All categories'), findsWidgets);
+    });
   });
 
   group('AppRoot and lock flow', () {
@@ -207,12 +248,16 @@ void main() {
         lockEnabled: true,
         pin: '1234',
       );
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+      );
 
       await tester.pumpWidget(
         wrapForTest(
           AppRoot(
             repository: repository,
             appLockService: appLockService,
+            categoryService: categoryService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
           ),
         ),
@@ -303,12 +348,14 @@ void main() {
         ),
       );
       final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService();
 
       await tester.pumpWidget(
         wrapForTest(
           CardDetailScreen(
             repository: repository,
             appLockService: appLockService,
+            categoryService: categoryService,
             cardId: 'visit-card',
           ),
         ),
