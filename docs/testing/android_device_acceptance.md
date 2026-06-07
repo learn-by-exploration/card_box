@@ -13,6 +13,23 @@ correct on real hardware, not just in code.
 - Install the latest release APK:
   - `build/app/outputs/flutter-apk/app-release.apk`
 
+## Recommended Order
+
+Run this alongside:
+
+- [Android device validation matrix](android_device_matrix.md)
+- [Android test session log](android_test_session_log.md)
+- [Prefilled 2026-06-07 session runbook](android_test_session_2026-06-07.md)
+- [Android bug report template](android_bug_report_template.md)
+
+Suggested execution:
+
+1. fill in the device/session header
+2. run the acceptance checklist below
+3. mark each scenario in the validation matrix
+4. file one bug report per failure
+5. summarize the session in the session log
+
 ## Capture Environment
 
 Record these before testing:

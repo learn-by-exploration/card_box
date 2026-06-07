@@ -172,14 +172,37 @@ class _EditCardScreenState extends State<EditCardScreen> {
               ? (editing ? 'Edit visiting card' : 'Add visiting card')
               : (editing ? 'Edit card' : 'Add card'),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Help',
+            icon: const Icon(Icons.help_outline_rounded),
+            onPressed: _showAddHelpSheet,
+          ),
+          if (editing) ...[
+            IconButton(
+              tooltip: widget.existingCard!.archived
+                  ? 'Restore card'
+                  : 'Archive card',
+              icon: Icon(
+                widget.existingCard!.archived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+              ),
+              onPressed: _toggleArchiveForExistingCard,
+            ),
+            IconButton(
+              tooltip: 'Delete permanently',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _confirmDeleteExistingCard,
+            ),
+          ],
+        ],
       ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            _AddFlowGuide(preset: widget.preset),
-            const SizedBox(height: 12),
             TextFormField(
               controller: _nameController,
               decoration: InputDecoration(
@@ -435,6 +458,99 @@ class _EditCardScreenState extends State<EditCardScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showAddHelpSheet() async {
+    if (!mounted) {
+      return;
+    }
+    final editing = widget.existingCard != null;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final tokens = CardBoxThemeTokens.of(context);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              tokens.spaceLarge,
+              0,
+              tokens.spaceLarge,
+              tokens.spaceXLarge,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  editing ? 'How this card flow works' : 'How to add this card',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: tokens.spaceSmall),
+                Text(
+                  'Use this as a quick guide, then come back here and keep moving.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                SizedBox(height: tokens.spaceLarge),
+                _AddFlowGuide(preset: widget.preset, framed: false),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleArchiveForExistingCard() async {
+    final card = widget.existingCard;
+    if (card == null) {
+      return;
+    }
+    if (card.archived) {
+      await widget.repository.unarchive(card.id);
+    } else {
+      await widget.repository.archive(card.id);
+    }
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _confirmDeleteExistingCard() async {
+    final card = widget.existingCard;
+    if (card == null) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete permanently?'),
+        content: Text(
+          '${card.name} and its saved images will be removed from this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    await widget.repository.deleteCard(card.id);
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
   }
 
   Future<void> _save() async {
@@ -1186,19 +1302,20 @@ class _MetadataHintCard extends StatelessWidget {
 }
 
 class _AddFlowGuide extends StatelessWidget {
-  const _AddFlowGuide({required this.preset});
+  const _AddFlowGuide({required this.preset, this.framed = true});
 
   final AddCardPreset preset;
+  final bool framed;
 
   @override
   Widget build(BuildContext context) {
     final tokens = CardBoxThemeTokens.of(context);
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(tokens.spaceLarge),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    final content = Padding(
+      padding: framed ? EdgeInsets.all(tokens.spaceLarge) : EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (framed) ...[
             Text(
               'How to add a card',
               style: Theme.of(
@@ -1206,35 +1323,39 @@ class _AddFlowGuide extends StatelessWidget {
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             SizedBox(height: tokens.spaceMedium - 2),
-            Text(_introText(), style: Theme.of(context).textTheme.bodySmall),
-            SizedBox(height: tokens.spaceMedium - 2),
-            const _GuideLine(
-              step: '1',
-              text: 'Enter the card name and category first.',
-            ),
-            SizedBox(height: tokens.spaceSmall),
-            const _GuideLine(
-              step: '2',
-              text:
-                  'Scan the front and back for cleaner edges, or add photos if that is easier.',
-            ),
-            SizedBox(height: tokens.spaceSmall),
-            const _GuideLine(
-              step: '3',
-              text: 'Scan a visible barcode or QR code if the card has one.',
-            ),
-            SizedBox(height: tokens.spaceSmall),
-            _GuideLine(step: '4', text: _stepFourText()),
-            SizedBox(height: tokens.spaceSmall),
-            const _GuideLine(
-              step: '5',
-              text:
-                  'If the card is unsupported by phone hardware, keep it as a reference card with photos and notes.',
-            ),
           ],
-        ),
+          Text(_introText(), style: Theme.of(context).textTheme.bodySmall),
+          SizedBox(height: tokens.spaceMedium - 2),
+          const _GuideLine(
+            step: '1',
+            text: 'Enter the card name and category first.',
+          ),
+          SizedBox(height: tokens.spaceSmall),
+          const _GuideLine(
+            step: '2',
+            text:
+                'Scan the front and back for cleaner edges, or add photos if that is easier.',
+          ),
+          SizedBox(height: tokens.spaceSmall),
+          const _GuideLine(
+            step: '3',
+            text: 'Scan a visible barcode or QR code if the card has one.',
+          ),
+          SizedBox(height: tokens.spaceSmall),
+          _GuideLine(step: '4', text: _stepFourText()),
+          SizedBox(height: tokens.spaceSmall),
+          const _GuideLine(
+            step: '5',
+            text:
+                'If the card is unsupported by phone hardware, keep it as a reference card with photos and notes.',
+          ),
+        ],
       ),
     );
+    if (!framed) {
+      return content;
+    }
+    return Card(child: content);
   }
 
   String _introText() {

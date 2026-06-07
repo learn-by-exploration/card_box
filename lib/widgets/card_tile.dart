@@ -98,13 +98,14 @@ class CardTile extends StatelessWidget {
                           ),
                         ),
                         SizedBox(width: tokens.spaceSmall),
-                        Text(
-                          card.hasBarcode
-                              ? 'Tap for code'
-                              : card.isVisitingCard
-                              ? 'Tap for contact'
-                              : 'Tap for actions',
-                          style: Theme.of(context).textTheme.bodySmall,
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _MoreAffordance(
+                              label: 'More options',
+                              compact: false,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -183,11 +184,9 @@ class CardTile extends StatelessWidget {
                 ),
               ),
               SizedBox(height: tokens.spaceSmall),
-              Text(
-                _gridActionHint(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _MoreAffordance(label: 'More', compact: true),
               ),
             ],
           ),
@@ -224,20 +223,53 @@ class CardTile extends StatelessWidget {
     };
   }
 
-  String _gridActionHint() {
-    if (card.hasBarcode) {
-      return 'Code';
-    }
-    if (card.isVisitingCard) {
-      return 'Contact';
-    }
-    return 'Card';
-  }
-
   CardBoxStatusTone _statusTone(CardBoxThemeTokens tokens) {
     return tokens.statusToneFor(
       card.compatibilityStatus,
       isVisitingCard: card.isVisitingCard,
+    );
+  }
+}
+
+class _MoreAffordance extends StatelessWidget {
+  const _MoreAffordance({required this.label, required this.compact});
+
+  final String label;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? tokens.spaceSmall : tokens.spaceMedium,
+          vertical: tokens.spaceXSmall,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.drag_handle_rounded,
+              size: compact ? tokens.iconSmall : tokens.iconMedium,
+              color: colors.onSurfaceVariant,
+            ),
+            SizedBox(width: tokens.spaceXSmall),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -190,6 +190,7 @@ Future<CategoryService> createReadyCategoryService({
 Future<ThemeService> createReadyThemeService({
   SharedPreferences? preferences,
   ThemeMode initialMode = ThemeMode.system,
+  CardBoxThemePalette initialPalette = CardBoxThemePalette.softTeal,
 }) async {
   final storedMode = switch (initialMode) {
     ThemeMode.light => 'light',
@@ -199,11 +200,16 @@ Future<ThemeService> createReadyThemeService({
   if (preferences == null) {
     SharedPreferences.setMockInitialValues({
       ThemeService.themeModeKey: storedMode,
+      ThemeService.themePaletteKey: initialPalette.storageKey,
     });
   }
   final prefs = preferences ?? await SharedPreferences.getInstance();
   if (preferences != null) {
     await prefs.setString(ThemeService.themeModeKey, storedMode);
+    await prefs.setString(
+      ThemeService.themePaletteKey,
+      initialPalette.storageKey,
+    );
   }
   final service = ThemeService(preferences: prefs);
   await service.init();

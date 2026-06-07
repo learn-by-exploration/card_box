@@ -36,3 +36,6 @@ guided it.
 - [Research notes](docs/research/initial_research.md)
 - [Open questions](docs/v_model/open_questions.md)
 - [Android device acceptance](docs/testing/android_device_acceptance.md)
+- [Android device validation matrix](docs/testing/android_device_matrix.md)
+- [Android test session log](docs/testing/android_test_session_log.md)
+- [Android test session runbook - 2026-06-07](docs/testing/android_test_session_2026-06-07.md)

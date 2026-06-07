@@ -63,8 +63,8 @@ class CardBoxApp extends StatelessWidget {
       animation: themeService,
       builder: (context, _) => MaterialApp(
         title: 'Card Box',
-        theme: cardBoxLightTheme,
-        darkTheme: cardBoxDarkTheme,
+        theme: cardBoxLightThemeFor(themeService.palette),
+        darkTheme: cardBoxDarkThemeFor(themeService.palette),
         themeMode: themeService.themeMode,
         debugShowCheckedModeBanner: false,
         home: AppRoot(

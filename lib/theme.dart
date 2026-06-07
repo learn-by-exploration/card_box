@@ -4,140 +4,463 @@ import 'package:flutter/material.dart';
 
 import 'package:card_box/models/compatibility_status.dart';
 
-ThemeData get cardBoxLightTheme {
-  const seed = Color(0xFF196C6B);
+enum CardBoxThemePalette { softTeal, forest, slate }
+
+extension CardBoxThemePaletteX on CardBoxThemePalette {
+  String get storageKey => switch (this) {
+    CardBoxThemePalette.softTeal => 'soft_teal',
+    CardBoxThemePalette.forest => 'forest',
+    CardBoxThemePalette.slate => 'slate',
+  };
+
+  String get label => switch (this) {
+    CardBoxThemePalette.softTeal => 'Soft teal',
+    CardBoxThemePalette.forest => 'Forest',
+    CardBoxThemePalette.slate => 'Slate',
+  };
+
+  String get description => switch (this) {
+    CardBoxThemePalette.softTeal => 'Fresh, light, and quietly modern.',
+    CardBoxThemePalette.forest => 'Calm, premium, and a little warmer.',
+    CardBoxThemePalette.slate => 'Minimal, neutral, and very clean.',
+  };
+}
+
+ThemeData get cardBoxLightTheme =>
+    cardBoxLightThemeFor(CardBoxThemePalette.softTeal);
+
+ThemeData get cardBoxDarkTheme =>
+    cardBoxDarkThemeFor(CardBoxThemePalette.softTeal);
+
+ThemeData cardBoxLightThemeFor(CardBoxThemePalette palette) {
+  final spec = _paletteSpec(palette);
   final scheme = ColorScheme.fromSeed(
     brightness: Brightness.light,
-    seedColor: seed,
-    primary: const Color(0xFF196C6B),
-    secondary: const Color(0xFFB65F2A),
-    tertiary: const Color(0xFF415F91),
-    surface: const Color(0xFFFDFDFD),
+    seedColor: spec.lightPrimary,
+    primary: spec.lightPrimary,
+    secondary: spec.lightSecondary,
+    tertiary: spec.lightTertiary,
+    surface: spec.lightOverlay,
   );
   return _buildTheme(
     scheme: scheme,
-    scaffoldBackground: const Color(0xFFF6F7F8),
-    fieldFill: const Color(0xFFFFFFFF),
-    borderColor: const Color(0xFFD9DEE3),
-    cardBorder: const Color(0xFFE3E7EB),
-    overlay: const Color(0xFFFFFFFF),
-    tokens: const CardBoxThemeTokens(
-      surfaceSubtle: Color(0xFFF1F4F6),
-      surfaceRaised: Color(0xFFFFFFFF),
-      surfaceInteractive: Color(0xFFE9F2F2),
-      borderSoft: Color(0xFFD9DEE3),
-      presentationSurface: Color(0xFFFFFFFF),
-      presentationCanvas: Color(0xFFF7F9FA),
-      statusContact: CardBoxStatusTone(
-        background: Color(0xFFE8F5F2),
-        foreground: Color(0xFF115847),
-      ),
-      statusReady: CardBoxStatusTone(
-        background: Color(0xFFEAF5EE),
-        foreground: Color(0xFF245E37),
-      ),
-      statusReadable: CardBoxStatusTone(
-        background: Color(0xFFE8F1FB),
-        foreground: Color(0xFF184A8B),
-      ),
-      statusReference: CardBoxStatusTone(
-        background: Color(0xFFF1EDE7),
-        foreground: Color(0xFF6A5648),
-      ),
-      statusWarning: CardBoxStatusTone(
-        background: Color(0xFFFCF1E3),
-        foreground: Color(0xFF8B5718),
-      ),
-      statusCandidate: CardBoxStatusTone(
-        background: Color(0xFFEFECF8),
-        foreground: Color(0xFF4B3E85),
-      ),
-      statusUnsupported: CardBoxStatusTone(
-        background: Color(0xFFFCEBEC),
-        foreground: Color(0xFF8D2727),
-      ),
-      appObscureScrim: Color(0xFF0F1416),
-      radiusSmall: 12,
-      radiusMedium: 14,
-      radiusLarge: 18,
-      spaceXSmall: 4,
-      spaceSmall: 8,
-      spaceMedium: 12,
-      spaceLarge: 16,
-      spaceXLarge: 20,
-      iconSmall: 18,
-      iconMedium: 20,
-      iconLarge: 24,
-    ),
+    scaffoldBackground: spec.lightScaffold,
+    fieldFill: spec.lightFieldFill,
+    borderColor: spec.lightBorder,
+    cardBorder: spec.lightCardBorder,
+    overlay: spec.lightOverlay,
+    tokens: spec.lightTokens,
   );
 }
 
-ThemeData get cardBoxDarkTheme {
-  const seed = Color(0xFF58B2AC);
+ThemeData cardBoxDarkThemeFor(CardBoxThemePalette palette) {
+  final spec = _paletteSpec(palette);
   final scheme = ColorScheme.fromSeed(
     brightness: Brightness.dark,
-    seedColor: seed,
-    primary: const Color(0xFF7AD1CB),
-    secondary: const Color(0xFFF3B37C),
-    tertiary: const Color(0xFFB7C8FF),
-    surface: const Color(0xFF15191B),
+    seedColor: spec.darkPrimary,
+    primary: spec.darkPrimary,
+    secondary: spec.darkSecondary,
+    tertiary: spec.darkTertiary,
+    surface: spec.darkOverlay,
   );
   return _buildTheme(
     scheme: scheme,
-    scaffoldBackground: const Color(0xFF101315),
-    fieldFill: const Color(0xFF171C1F),
-    borderColor: const Color(0xFF2A3135),
-    cardBorder: const Color(0xFF232A2E),
-    overlay: const Color(0xFF161B1D),
-    tokens: const CardBoxThemeTokens(
-      surfaceSubtle: Color(0xFF1B2023),
-      surfaceRaised: Color(0xFF161B1D),
-      surfaceInteractive: Color(0xFF203032),
-      borderSoft: Color(0xFF2A3135),
-      presentationSurface: Color(0xFFF6F8F9),
-      presentationCanvas: Color(0xFF111518),
-      statusContact: CardBoxStatusTone(
-        background: Color(0xFF17352D),
-        foreground: Color(0xFF9FE3CF),
-      ),
-      statusReady: CardBoxStatusTone(
-        background: Color(0xFF203629),
-        foreground: Color(0xFFAAE1B6),
-      ),
-      statusReadable: CardBoxStatusTone(
-        background: Color(0xFF1A314B),
-        foreground: Color(0xFFA9CFFF),
-      ),
-      statusReference: CardBoxStatusTone(
-        background: Color(0xFF322B25),
-        foreground: Color(0xFFE3C8AF),
-      ),
-      statusWarning: CardBoxStatusTone(
-        background: Color(0xFF3A2D1E),
-        foreground: Color(0xFFF0C28D),
-      ),
-      statusCandidate: CardBoxStatusTone(
-        background: Color(0xFF2D2743),
-        foreground: Color(0xFFD2C1FF),
-      ),
-      statusUnsupported: CardBoxStatusTone(
-        background: Color(0xFF3D2426),
-        foreground: Color(0xFFFFBAB9),
-      ),
-      appObscureScrim: Color(0xFF0B0E10),
-      radiusSmall: 12,
-      radiusMedium: 14,
-      radiusLarge: 18,
-      spaceXSmall: 4,
-      spaceSmall: 8,
-      spaceMedium: 12,
-      spaceLarge: 16,
-      spaceXLarge: 20,
-      iconSmall: 18,
-      iconMedium: 20,
-      iconLarge: 24,
-    ),
+    scaffoldBackground: spec.darkScaffold,
+    fieldFill: spec.darkFieldFill,
+    borderColor: spec.darkBorder,
+    cardBorder: spec.darkCardBorder,
+    overlay: spec.darkOverlay,
+    tokens: spec.darkTokens,
   );
+}
+
+class _CardBoxPaletteSpec {
+  const _CardBoxPaletteSpec({
+    required this.lightPrimary,
+    required this.lightSecondary,
+    required this.lightTertiary,
+    required this.lightScaffold,
+    required this.lightFieldFill,
+    required this.lightBorder,
+    required this.lightCardBorder,
+    required this.lightOverlay,
+    required this.lightTokens,
+    required this.darkPrimary,
+    required this.darkSecondary,
+    required this.darkTertiary,
+    required this.darkScaffold,
+    required this.darkFieldFill,
+    required this.darkBorder,
+    required this.darkCardBorder,
+    required this.darkOverlay,
+    required this.darkTokens,
+  });
+
+  final Color lightPrimary;
+  final Color lightSecondary;
+  final Color lightTertiary;
+  final Color lightScaffold;
+  final Color lightFieldFill;
+  final Color lightBorder;
+  final Color lightCardBorder;
+  final Color lightOverlay;
+  final CardBoxThemeTokens lightTokens;
+  final Color darkPrimary;
+  final Color darkSecondary;
+  final Color darkTertiary;
+  final Color darkScaffold;
+  final Color darkFieldFill;
+  final Color darkBorder;
+  final Color darkCardBorder;
+  final Color darkOverlay;
+  final CardBoxThemeTokens darkTokens;
+}
+
+_CardBoxPaletteSpec _paletteSpec(CardBoxThemePalette palette) {
+  return switch (palette) {
+    CardBoxThemePalette.softTeal => const _CardBoxPaletteSpec(
+      lightPrimary: Color(0xFF1B8A88),
+      lightSecondary: Color(0xFFCA6F3C),
+      lightTertiary: Color(0xFF5C6FB2),
+      lightScaffold: Color(0xFFF6F8F8),
+      lightFieldFill: Color(0xFFFFFFFF),
+      lightBorder: Color(0xFFD8E0E0),
+      lightCardBorder: Color(0xFFE2E8E8),
+      lightOverlay: Color(0xFFFFFFFF),
+      lightTokens: CardBoxThemeTokens(
+        surfaceSubtle: Color(0xFFF0F5F5),
+        surfaceRaised: Color(0xFFFFFFFF),
+        surfaceInteractive: Color(0xFFE6F3F2),
+        borderSoft: Color(0xFFD8E0E0),
+        presentationSurface: Color(0xFFFFFFFF),
+        presentationCanvas: Color(0xFFF7F9F9),
+        statusContact: CardBoxStatusTone(
+          background: Color(0xFFE8F6F4),
+          foreground: Color(0xFF155D59),
+        ),
+        statusReady: CardBoxStatusTone(
+          background: Color(0xFFEAF6EE),
+          foreground: Color(0xFF255E3B),
+        ),
+        statusReadable: CardBoxStatusTone(
+          background: Color(0xFFE9F2FC),
+          foreground: Color(0xFF1D4E8F),
+        ),
+        statusReference: CardBoxStatusTone(
+          background: Color(0xFFF2EEEA),
+          foreground: Color(0xFF6D594A),
+        ),
+        statusWarning: CardBoxStatusTone(
+          background: Color(0xFFFCF2E4),
+          foreground: Color(0xFF8A591B),
+        ),
+        statusCandidate: CardBoxStatusTone(
+          background: Color(0xFFEFEDF8),
+          foreground: Color(0xFF4D4184),
+        ),
+        statusUnsupported: CardBoxStatusTone(
+          background: Color(0xFFFCEBED),
+          foreground: Color(0xFF8E2A2A),
+        ),
+        appObscureScrim: Color(0xFF0F1416),
+        radiusSmall: 12,
+        radiusMedium: 14,
+        radiusLarge: 18,
+        spaceXSmall: 4,
+        spaceSmall: 8,
+        spaceMedium: 12,
+        spaceLarge: 16,
+        spaceXLarge: 20,
+        iconSmall: 18,
+        iconMedium: 20,
+        iconLarge: 24,
+      ),
+      darkPrimary: Color(0xFF7BD7D1),
+      darkSecondary: Color(0xFFF0B07D),
+      darkTertiary: Color(0xFFC2CBFF),
+      darkScaffold: Color(0xFF101415),
+      darkFieldFill: Color(0xFF171D1E),
+      darkBorder: Color(0xFF293233),
+      darkCardBorder: Color(0xFF232B2C),
+      darkOverlay: Color(0xFF161C1D),
+      darkTokens: CardBoxThemeTokens(
+        surfaceSubtle: Color(0xFF1A2122),
+        surfaceRaised: Color(0xFF161C1D),
+        surfaceInteractive: Color(0xFF203334),
+        borderSoft: Color(0xFF293233),
+        presentationSurface: Color(0xFFF6F8F9),
+        presentationCanvas: Color(0xFF111617),
+        statusContact: CardBoxStatusTone(
+          background: Color(0xFF173731),
+          foreground: Color(0xFFA2E6D8),
+        ),
+        statusReady: CardBoxStatusTone(
+          background: Color(0xFF21372A),
+          foreground: Color(0xFFB0E6BC),
+        ),
+        statusReadable: CardBoxStatusTone(
+          background: Color(0xFF1B324C),
+          foreground: Color(0xFFAED2FF),
+        ),
+        statusReference: CardBoxStatusTone(
+          background: Color(0xFF332D27),
+          foreground: Color(0xFFE5CCB3),
+        ),
+        statusWarning: CardBoxStatusTone(
+          background: Color(0xFF3C2E1E),
+          foreground: Color(0xFFF2C792),
+        ),
+        statusCandidate: CardBoxStatusTone(
+          background: Color(0xFF2E2845),
+          foreground: Color(0xFFD6C5FF),
+        ),
+        statusUnsupported: CardBoxStatusTone(
+          background: Color(0xFF3F2427),
+          foreground: Color(0xFFFFBCBC),
+        ),
+        appObscureScrim: Color(0xFF0B0E10),
+        radiusSmall: 12,
+        radiusMedium: 14,
+        radiusLarge: 18,
+        spaceXSmall: 4,
+        spaceSmall: 8,
+        spaceMedium: 12,
+        spaceLarge: 16,
+        spaceXLarge: 20,
+        iconSmall: 18,
+        iconMedium: 20,
+        iconLarge: 24,
+      ),
+    ),
+    CardBoxThemePalette.forest => const _CardBoxPaletteSpec(
+      lightPrimary: Color(0xFF2A6E55),
+      lightSecondary: Color(0xFFB87443),
+      lightTertiary: Color(0xFF536B4E),
+      lightScaffold: Color(0xFFF7F8F5),
+      lightFieldFill: Color(0xFFFFFFFF),
+      lightBorder: Color(0xFFDCE2D8),
+      lightCardBorder: Color(0xFFE5E9E1),
+      lightOverlay: Color(0xFFFFFFFF),
+      lightTokens: CardBoxThemeTokens(
+        surfaceSubtle: Color(0xFFF2F5F0),
+        surfaceRaised: Color(0xFFFFFFFF),
+        surfaceInteractive: Color(0xFFE9F2EC),
+        borderSoft: Color(0xFFDCE2D8),
+        presentationSurface: Color(0xFFFFFFFF),
+        presentationCanvas: Color(0xFFF7F8F5),
+        statusContact: CardBoxStatusTone(
+          background: Color(0xFFEAF6EF),
+          foreground: Color(0xFF1D5B45),
+        ),
+        statusReady: CardBoxStatusTone(
+          background: Color(0xFFEEF6EA),
+          foreground: Color(0xFF365A2B),
+        ),
+        statusReadable: CardBoxStatusTone(
+          background: Color(0xFFEAF1FB),
+          foreground: Color(0xFF214D86),
+        ),
+        statusReference: CardBoxStatusTone(
+          background: Color(0xFFF3EFE8),
+          foreground: Color(0xFF6D5B48),
+        ),
+        statusWarning: CardBoxStatusTone(
+          background: Color(0xFFFDF1E4),
+          foreground: Color(0xFF8B591B),
+        ),
+        statusCandidate: CardBoxStatusTone(
+          background: Color(0xFFEFEDF7),
+          foreground: Color(0xFF4D4281),
+        ),
+        statusUnsupported: CardBoxStatusTone(
+          background: Color(0xFFFCEBED),
+          foreground: Color(0xFF8E2A2A),
+        ),
+        appObscureScrim: Color(0xFF101513),
+        radiusSmall: 12,
+        radiusMedium: 14,
+        radiusLarge: 18,
+        spaceXSmall: 4,
+        spaceSmall: 8,
+        spaceMedium: 12,
+        spaceLarge: 16,
+        spaceXLarge: 20,
+        iconSmall: 18,
+        iconMedium: 20,
+        iconLarge: 24,
+      ),
+      darkPrimary: Color(0xFF85C9A7),
+      darkSecondary: Color(0xFFF0B78B),
+      darkTertiary: Color(0xFFC0D4B8),
+      darkScaffold: Color(0xFF101513),
+      darkFieldFill: Color(0xFF171D1A),
+      darkBorder: Color(0xFF2A322D),
+      darkCardBorder: Color(0xFF232B26),
+      darkOverlay: Color(0xFF161C19),
+      darkTokens: CardBoxThemeTokens(
+        surfaceSubtle: Color(0xFF1B211E),
+        surfaceRaised: Color(0xFF161C19),
+        surfaceInteractive: Color(0xFF223129),
+        borderSoft: Color(0xFF2A322D),
+        presentationSurface: Color(0xFFF7F8F5),
+        presentationCanvas: Color(0xFF111613),
+        statusContact: CardBoxStatusTone(
+          background: Color(0xFF1A372C),
+          foreground: Color(0xFFA9E4C2),
+        ),
+        statusReady: CardBoxStatusTone(
+          background: Color(0xFF263625),
+          foreground: Color(0xFFB7E4AA),
+        ),
+        statusReadable: CardBoxStatusTone(
+          background: Color(0xFF1A314B),
+          foreground: Color(0xFFAFD2FF),
+        ),
+        statusReference: CardBoxStatusTone(
+          background: Color(0xFF342D27),
+          foreground: Color(0xFFE4CEB5),
+        ),
+        statusWarning: CardBoxStatusTone(
+          background: Color(0xFF3C2F1F),
+          foreground: Color(0xFFF2C895),
+        ),
+        statusCandidate: CardBoxStatusTone(
+          background: Color(0xFF2E2843),
+          foreground: Color(0xFFD5C6FF),
+        ),
+        statusUnsupported: CardBoxStatusTone(
+          background: Color(0xFF3F2427),
+          foreground: Color(0xFFFFBCBC),
+        ),
+        appObscureScrim: Color(0xFF0B100E),
+        radiusSmall: 12,
+        radiusMedium: 14,
+        radiusLarge: 18,
+        spaceXSmall: 4,
+        spaceSmall: 8,
+        spaceMedium: 12,
+        spaceLarge: 16,
+        spaceXLarge: 20,
+        iconSmall: 18,
+        iconMedium: 20,
+        iconLarge: 24,
+      ),
+    ),
+    CardBoxThemePalette.slate => const _CardBoxPaletteSpec(
+      lightPrimary: Color(0xFF476B7A),
+      lightSecondary: Color(0xFF9A6B47),
+      lightTertiary: Color(0xFF5E6280),
+      lightScaffold: Color(0xFFF7F8FA),
+      lightFieldFill: Color(0xFFFFFFFF),
+      lightBorder: Color(0xFFD8DEE5),
+      lightCardBorder: Color(0xFFE2E7ED),
+      lightOverlay: Color(0xFFFFFFFF),
+      lightTokens: CardBoxThemeTokens(
+        surfaceSubtle: Color(0xFFF1F4F7),
+        surfaceRaised: Color(0xFFFFFFFF),
+        surfaceInteractive: Color(0xFFEAF0F5),
+        borderSoft: Color(0xFFD8DEE5),
+        presentationSurface: Color(0xFFFFFFFF),
+        presentationCanvas: Color(0xFFF8F9FB),
+        statusContact: CardBoxStatusTone(
+          background: Color(0xFFEAF3F6),
+          foreground: Color(0xFF244F5E),
+        ),
+        statusReady: CardBoxStatusTone(
+          background: Color(0xFFEEF5EE),
+          foreground: Color(0xFF34583A),
+        ),
+        statusReadable: CardBoxStatusTone(
+          background: Color(0xFFEAF1FB),
+          foreground: Color(0xFF214D86),
+        ),
+        statusReference: CardBoxStatusTone(
+          background: Color(0xFFF1EEEA),
+          foreground: Color(0xFF675A4D),
+        ),
+        statusWarning: CardBoxStatusTone(
+          background: Color(0xFFFDF1E4),
+          foreground: Color(0xFF8A591B),
+        ),
+        statusCandidate: CardBoxStatusTone(
+          background: Color(0xFFEFEDF7),
+          foreground: Color(0xFF4D4281),
+        ),
+        statusUnsupported: CardBoxStatusTone(
+          background: Color(0xFFFCEBED),
+          foreground: Color(0xFF8E2A2A),
+        ),
+        appObscureScrim: Color(0xFF111417),
+        radiusSmall: 12,
+        radiusMedium: 14,
+        radiusLarge: 18,
+        spaceXSmall: 4,
+        spaceSmall: 8,
+        spaceMedium: 12,
+        spaceLarge: 16,
+        spaceXLarge: 20,
+        iconSmall: 18,
+        iconMedium: 20,
+        iconLarge: 24,
+      ),
+      darkPrimary: Color(0xFFA8C7D3),
+      darkSecondary: Color(0xFFDAB38F),
+      darkTertiary: Color(0xFFD2D5F4),
+      darkScaffold: Color(0xFF101417),
+      darkFieldFill: Color(0xFF171C20),
+      darkBorder: Color(0xFF2A3138),
+      darkCardBorder: Color(0xFF232A30),
+      darkOverlay: Color(0xFF161B1F),
+      darkTokens: CardBoxThemeTokens(
+        surfaceSubtle: Color(0xFF1B2025),
+        surfaceRaised: Color(0xFF161B1F),
+        surfaceInteractive: Color(0xFF21303A),
+        borderSoft: Color(0xFF2A3138),
+        presentationSurface: Color(0xFFF6F8F9),
+        presentationCanvas: Color(0xFF111518),
+        statusContact: CardBoxStatusTone(
+          background: Color(0xFF1C333D),
+          foreground: Color(0xFFB2DBEA),
+        ),
+        statusReady: CardBoxStatusTone(
+          background: Color(0xFF243629),
+          foreground: Color(0xFFB7E4B8),
+        ),
+        statusReadable: CardBoxStatusTone(
+          background: Color(0xFF1A314B),
+          foreground: Color(0xFFAFD2FF),
+        ),
+        statusReference: CardBoxStatusTone(
+          background: Color(0xFF332D27),
+          foreground: Color(0xFFE4CEB5),
+        ),
+        statusWarning: CardBoxStatusTone(
+          background: Color(0xFF3B2E1F),
+          foreground: Color(0xFFF1C894),
+        ),
+        statusCandidate: CardBoxStatusTone(
+          background: Color(0xFF2E2843),
+          foreground: Color(0xFFD5C6FF),
+        ),
+        statusUnsupported: CardBoxStatusTone(
+          background: Color(0xFF3F2427),
+          foreground: Color(0xFFFFBCBC),
+        ),
+        appObscureScrim: Color(0xFF0B0E10),
+        radiusSmall: 12,
+        radiusMedium: 14,
+        radiusLarge: 18,
+        spaceXSmall: 4,
+        spaceSmall: 8,
+        spaceMedium: 12,
+        spaceLarge: 16,
+        spaceXLarge: 20,
+        iconSmall: 18,
+        iconMedium: 20,
+        iconLarge: 24,
+      ),
+    ),
+  };
 }
 
 ThemeData _buildTheme({

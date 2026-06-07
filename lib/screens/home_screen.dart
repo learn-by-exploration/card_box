@@ -362,9 +362,18 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               FloatingActionButton.small(
                 heroTag: 'search_fab',
-                tooltip: 'Search cards',
+                tooltip: 'Search',
                 onPressed: _openSearch,
                 child: const Icon(Icons.search),
+              ),
+              const SizedBox(height: 12),
+              FloatingActionButton.small(
+                heroTag: 'help_fab',
+                tooltip: _browseMode == _BrowseMode.cards
+                    ? 'How to add cards'
+                    : 'How to add contacts',
+                onPressed: _openAddHelp,
+                child: const Icon(Icons.help_outline_rounded),
               ),
               const SizedBox(height: 12),
               FloatingActionButton.extended(
@@ -382,6 +391,97 @@ class _HomeScreenState extends State<HomeScreen> {
                     : _openContactAddPicker,
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openAddHelp() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final tokens = CardBoxThemeTokens.of(context);
+        final isCards = _browseMode == _BrowseMode.cards;
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              tokens.spaceLarge,
+              0,
+              tokens.spaceLarge,
+              tokens.spaceXLarge,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isCards ? 'How to add a card' : 'How to add a contact',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: tokens.spaceSmall),
+                Text(
+                  isCards
+                      ? 'Pick the path that matches what you are holding. You can still edit everything afterward.'
+                      : 'Choose the fastest way to get a visiting card or contact saved, then tidy the details afterward.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                SizedBox(height: tokens.spaceLarge),
+                if (isCards) ...[
+                  const _HelpOptionRow(
+                    icon: Icons.qr_code_2,
+                    title: 'Barcode card',
+                    body:
+                        'Best for loyalty, library, membership, and gift cards with visible barcodes or QR codes.',
+                  ),
+                  const SizedBox(height: 12),
+                  const _HelpOptionRow(
+                    icon: Icons.nfc,
+                    title: 'NFC / RFID card',
+                    body:
+                        'Best for tap-style cards like access or transit. Save it first, then test what this phone can read.',
+                  ),
+                  const SizedBox(height: 12),
+                  const _HelpOptionRow(
+                    icon: Icons.contact_page_outlined,
+                    title: 'Visiting card',
+                    body:
+                        'Best for business cards. Scan the card, extract details, and review what should become a saved contact.',
+                  ),
+                  const SizedBox(height: 12),
+                  const _HelpOptionRow(
+                    icon: Icons.badge_outlined,
+                    title: 'Reference card',
+                    body:
+                        'Best when the phone cannot use the card directly and you mainly want front/back images plus notes.',
+                  ),
+                  const SizedBox(height: 12),
+                  const _HelpOptionRow(
+                    icon: Icons.add_card,
+                    title: 'General card',
+                    body:
+                        'Best when you are not sure yet. Start blank and add only the parts this card really needs.',
+                  ),
+                ] else ...[
+                  const _HelpOptionRow(
+                    icon: Icons.document_scanner_outlined,
+                    title: 'Scan visiting card',
+                    body:
+                        'Use this when the business card is in front of you and you want the fastest capture flow.',
+                  ),
+                  const SizedBox(height: 12),
+                  const _HelpOptionRow(
+                    icon: Icons.contact_page_outlined,
+                    title: 'Add contact manually',
+                    body:
+                        'Use this when you already know the details or only need a simple contact record first.',
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       },
@@ -606,6 +706,13 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'More options',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
                 Text(card.name, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
@@ -1258,6 +1365,54 @@ class _SectionLabel extends StatelessWidget {
           ),
         ),
         trailing ?? const SizedBox.shrink(),
+      ],
+    );
+  }
+}
+
+class _HelpOptionRow extends StatelessWidget {
+  const _HelpOptionRow({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(tokens.radiusSmall),
+          ),
+          child: Icon(icon, color: colors.primary),
+        ),
+        SizedBox(width: tokens.spaceMedium),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: tokens.spaceXSmall / 2),
+              Text(body, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
       ],
     );
   }

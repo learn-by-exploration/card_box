@@ -17,6 +17,7 @@ import 'package:card_box/screens/home_screen.dart';
 import 'package:card_box/screens/theme_settings_screen.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/media_recovery_service.dart';
+import 'package:card_box/services/theme_service.dart';
 import 'package:card_box/theme.dart';
 
 import 'test_support.dart';
@@ -95,7 +96,7 @@ void main() {
       await tester.tap(find.text('Contacts'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Search cards'));
+      await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'basketball');
       await tester.pumpAndSettle();
@@ -116,6 +117,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Library card'), findsOneWidget);
       expect(find.text('Aiko Tanaka'), findsNothing);
+
+      await tester.tap(find.byTooltip('How to add cards'));
+      await tester.pumpAndSettle();
+      expect(find.text('How to add a card'), findsOneWidget);
+      expect(find.text('Barcode card'), findsOneWidget);
+      expect(find.text('General card'), findsOneWidget);
     });
 
     testWidgets('barcode card actions open full-screen code presentation', (
@@ -342,12 +349,15 @@ void main() {
   });
 
   group('Theme settings', () {
-    testWidgets('theme mode can be updated from settings', (tester) async {
+    testWidgets('theme mode and palette can be updated from settings', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       final themeService = await createReadyThemeService(
         preferences: prefs,
         initialMode: ThemeMode.system,
+        initialPalette: CardBoxThemePalette.softTeal,
       );
 
       await tester.pumpWidget(
@@ -356,10 +366,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(themeService.themeMode, ThemeMode.system);
+      expect(themeService.palette, CardBoxThemePalette.softTeal);
+      await tester.tap(find.text('Slate'));
+      await tester.pumpAndSettle();
+      expect(themeService.palette, CardBoxThemePalette.slate);
+      expect(
+        prefs.getString(ThemeService.themePaletteKey),
+        CardBoxThemePalette.slate.storageKey,
+      );
       await tester.tap(find.text('Dark'));
       await tester.pumpAndSettle();
       expect(themeService.themeMode, ThemeMode.dark);
-      expect(prefs.getString('card_box.theme_mode.v1'), 'dark');
+      expect(prefs.getString(ThemeService.themeModeKey), 'dark');
     });
   });
 

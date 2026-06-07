@@ -14,6 +14,7 @@ class ThemeSettingsScreen extends StatelessWidget {
       animation: themeService,
       builder: (context, _) {
         final mode = themeService.themeMode;
+        final palette = themeService.palette;
         final tokens = CardBoxThemeTokens.of(context);
         return Scaffold(
           appBar: AppBar(title: const Text('Theme')),
@@ -30,6 +31,29 @@ class ThemeSettingsScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               SizedBox(height: tokens.spaceLarge),
+              Text(
+                'Color style',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: tokens.spaceSmall),
+              for (final candidate in CardBoxThemePalette.values) ...[
+                _ThemePaletteTile(
+                  palette: candidate,
+                  selected: palette == candidate,
+                  onTap: () => themeService.updatePalette(candidate),
+                ),
+                SizedBox(height: tokens.spaceMedium - 2),
+              ],
+              SizedBox(height: tokens.spaceSmall),
+              Text(
+                'Appearance mode',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: tokens.spaceSmall),
               _ThemeModeTile(
                 title: 'System',
                 subtitle: 'Match your phone settings automatically.',
@@ -57,6 +81,97 @@ class ThemeSettingsScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ThemePaletteTile extends StatelessWidget {
+  const _ThemePaletteTile({
+    required this.palette,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CardBoxThemePalette palette;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
+    final swatches = switch (palette) {
+      CardBoxThemePalette.softTeal => const <Color>[
+        Color(0xFF1B8A88),
+        Color(0xFFCA6F3C),
+        Color(0xFFF0F5F5),
+      ],
+      CardBoxThemePalette.forest => const <Color>[
+        Color(0xFF2A6E55),
+        Color(0xFFB87443),
+        Color(0xFFF2F5F0),
+      ],
+      CardBoxThemePalette.slate => const <Color>[
+        Color(0xFF476B7A),
+        Color(0xFF9A6B47),
+        Color(0xFFF1F4F7),
+      ],
+    };
+    return Material(
+      color: selected ? colors.secondaryContainer : colors.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(tokens.radiusMedium),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(tokens.radiusMedium),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.all(tokens.spaceMedium),
+          child: Row(
+            children: [
+              Row(
+                children: [
+                  for (final swatch in swatches)
+                    Container(
+                      width: 20,
+                      height: 20,
+                      margin: EdgeInsets.only(right: tokens.spaceXSmall),
+                      decoration: BoxDecoration(
+                        color: swatch,
+                        borderRadius: BorderRadius.circular(tokens.radiusSmall),
+                        border: Border.all(color: colors.outlineVariant),
+                      ),
+                    ),
+                ],
+              ),
+              SizedBox(width: tokens.spaceMedium),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      palette.label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: tokens.spaceXSmall / 2),
+                    Text(
+                      palette.description,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: tokens.spaceMedium),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

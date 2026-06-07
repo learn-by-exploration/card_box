@@ -163,6 +163,62 @@ void main() {
       expect(saved.contactPhones, <String>['+81 90 1111 2222']);
       expect(fakeOcrService.lastFrontImagePath, frontImagePath);
     });
+
+    testWidgets('existing cards expose help and archive controls', (
+      tester,
+    ) async {
+      await _setLargeSurface(tester);
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      final existing = WalletCard(
+        id: 'club-card',
+        name: 'Club Card',
+        category: CardCategory.membership,
+        createdAt: DateTime(2026, 6, 6),
+        updatedAt: DateTime(2026, 6, 6),
+      );
+      await repository.upsert(existing);
+      final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+      );
+      final mediaRecoveryService = MediaRecoveryService(preferences: prefs);
+
+      await tester.pumpWidget(
+        wrapForTest(
+          Navigator(
+            onGenerateRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => EditCardScreen(
+                repository: repository,
+                appLockService: appLockService,
+                categoryService: categoryService,
+                mediaRecoveryService: mediaRecoveryService,
+                existingCard: existing,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Help'), findsOneWidget);
+      expect(find.byTooltip('Archive card'), findsOneWidget);
+      expect(find.byTooltip('Delete permanently'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Help'));
+      await tester.pumpAndSettle();
+      expect(find.text('How this card flow works'), findsOneWidget);
+      expect(find.textContaining('Enter the card name'), findsOneWidget);
+
+      Navigator.of(tester.element(find.text('How this card flow works'))).pop();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Archive card'));
+      await tester.pumpAndSettle();
+      expect(repository.findById(existing.id)!.archived, isTrue);
+    });
   });
 
   group('ExportImportScreen', () {
