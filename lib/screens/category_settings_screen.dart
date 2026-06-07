@@ -189,7 +189,6 @@ class CategorySettingsScreen extends StatelessWidget {
         ],
       ),
     );
-    controller.dispose();
     if (newLabel == null || !context.mounted) {
       return;
     }
@@ -250,7 +249,6 @@ class CategorySettingsScreen extends StatelessWidget {
         ],
       ),
     );
-    controller.dispose();
     if (nextLabel == null || !context.mounted) {
       return;
     }
@@ -403,7 +401,6 @@ class CategorySettingsScreen extends StatelessWidget {
       ),
     );
 
-    newCustomController.dispose();
     if (result == null || !context.mounted) {
       return;
     }

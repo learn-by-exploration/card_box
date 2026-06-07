@@ -11,16 +11,20 @@ import 'package:card_box/services/nfc_service.dart';
 import 'package:card_box/theme.dart';
 
 class CompatibilityTestScreen extends StatefulWidget {
-  const CompatibilityTestScreen({
+  CompatibilityTestScreen({
     super.key,
     required this.repository,
     required this.appLockService,
     required this.card,
-  });
+    NfcService? nfcService,
+    this.deviceSettingsService = const DeviceSettingsService(),
+  }) : nfcService = nfcService ?? NfcService();
 
   final CardRepository repository;
   final AppLockService appLockService;
   final WalletCard card;
+  final NfcService nfcService;
+  final DeviceSettingsService deviceSettingsService;
 
   @override
   State<CompatibilityTestScreen> createState() =>
@@ -31,8 +35,6 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   bool _nfcConsent = false;
   CompatibilityStatus _selectedStatus = CompatibilityStatus.untested;
   final _summaryController = TextEditingController();
-  final _nfcService = NfcService();
-  final _deviceSettingsService = const DeviceSettingsService();
   NfcAvailability? _availability;
   bool _loadingAvailability = true;
   bool _scanning = false;
@@ -161,7 +163,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   }
 
   Future<void> _loadAvailability() async {
-    final availability = await _nfcService.checkAvailability();
+    final availability = await widget.nfcService.checkAvailability();
     if (!mounted) {
       return;
     }
@@ -193,7 +195,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
     widget.appLockService.beginTrustedExternalFlow();
     setState(() => _scanning = true);
     try {
-      final result = await _nfcService.scanTag();
+      final result = await widget.nfcService.scanTag();
       if (!mounted) {
         return;
       }
@@ -252,7 +254,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
   Future<void> _openNfcSettings() async {
     try {
       widget.appLockService.beginTrustedExternalFlow();
-      final opened = await _deviceSettingsService.openNfcSettings();
+      final opened = await widget.deviceSettingsService.openNfcSettings();
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

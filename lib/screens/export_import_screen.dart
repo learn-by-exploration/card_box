@@ -9,23 +9,26 @@ import 'package:card_box/services/file_share_service.dart';
 import 'package:card_box/theme.dart';
 
 class ExportImportScreen extends StatefulWidget {
-  const ExportImportScreen({
+  ExportImportScreen({
     super.key,
     required this.repository,
     required this.appLockService,
-  });
+    this.backupFileService = const BackupFileService(),
+    BackupCryptoService? backupCryptoService,
+    this.fileShareService = const FileShareService(),
+  }) : backupCryptoService = backupCryptoService ?? BackupCryptoService();
 
   final CardRepository repository;
   final AppLockService appLockService;
+  final BackupFileService backupFileService;
+  final BackupCryptoService backupCryptoService;
+  final FileShareService fileShareService;
 
   @override
   State<ExportImportScreen> createState() => _ExportImportScreenState();
 }
 
 class _ExportImportScreenState extends State<ExportImportScreen> {
-  final _backupFileService = BackupFileService();
-  final _backupCryptoService = BackupCryptoService();
-  final _fileShareService = const FileShareService();
   BackupFileInfo? _latestBackup;
   String _message = '';
   bool _exporting = false;
@@ -161,7 +164,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
       mode: _BackupExportMode.encrypted,
       rawJsonLoader: () async {
         final plainJson = await widget.repository.exportPlainJson();
-        return _backupCryptoService.encryptJson(
+        return widget.backupCryptoService.encryptJson(
           rawJson: plainJson,
           password: password,
         );
@@ -181,7 +184,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         _message = '';
       });
       widget.appLockService.beginTrustedExternalFlow();
-      final backup = await _backupFileService.createBackupFile(
+      final backup = await widget.backupFileService.createBackupFile(
         rawJson: await rawJsonLoader(),
         cardCount: widget.repository.cards.length,
         fileNamePrefix: fileNamePrefix,
@@ -190,7 +193,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         setState(() => _message = 'Backup export canceled.');
         return;
       }
-      final shared = await _fileShareService.shareFile(
+      final shared = await widget.fileShareService.shareFile(
         path: backup.path,
         subject: backup.fileName,
         text: 'Card Box backup file',
@@ -220,14 +223,14 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         _message = '';
       });
       widget.appLockService.beginTrustedExternalFlow();
-      final imported = await _backupFileService.pickBackupFile();
+      final imported = await widget.backupFileService.pickBackupFile();
       if (imported == null) {
         setState(() => _message = 'Import canceled.');
         return;
       }
       var rawJson = imported.rawJson;
       var label = imported.fileName;
-      if (_backupCryptoService.looksEncrypted(rawJson)) {
+      if (widget.backupCryptoService.looksEncrypted(rawJson)) {
         final password = await _promptForPassword(
           title: 'Unlock encrypted backup',
           actionLabel: 'Decrypt backup',
@@ -239,7 +242,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
           setState(() => _message = 'Encrypted import canceled.');
           return;
         }
-        rawJson = await _backupCryptoService.decryptJson(
+        rawJson = await widget.backupCryptoService.decryptJson(
           encryptedJson: rawJson,
           password: password,
         );

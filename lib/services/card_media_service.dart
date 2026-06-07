@@ -9,12 +9,150 @@ import 'package:card_box/services/card_media_exception.dart';
 import 'package:card_box/services/card_media_store.dart' as media_store;
 import 'package:card_box/services/ios_document_scanner.dart';
 
+abstract class CardMediaStoreDelegate {
+  Future<String> storePickedImage(
+    XFile picked, {
+    required String cardId,
+    required String side,
+  });
+
+  Future<String> storeImageBytes(
+    Uint8List bytes, {
+    required String sourcePath,
+    required String cardId,
+    required String side,
+  });
+}
+
+class DefaultCardMediaStoreDelegate implements CardMediaStoreDelegate {
+  const DefaultCardMediaStoreDelegate();
+
+  @override
+  Future<String> storePickedImage(
+    XFile picked, {
+    required String cardId,
+    required String side,
+  }) {
+    return media_store.storePickedImage(picked, cardId: cardId, side: side);
+  }
+
+  @override
+  Future<String> storeImageBytes(
+    Uint8List bytes, {
+    required String sourcePath,
+    required String cardId,
+    required String side,
+  }) {
+    return media_store.storeImageBytes(
+      bytes,
+      sourcePath: sourcePath,
+      cardId: cardId,
+      side: side,
+    );
+  }
+}
+
+abstract class CardPhotoEditor {
+  Future<CroppedFile?> cropImage({
+    required String sourcePath,
+    required String title,
+  });
+}
+
+class DefaultCardPhotoEditor implements CardPhotoEditor {
+  const DefaultCardPhotoEditor();
+
+  @override
+  Future<CroppedFile?> cropImage({
+    required String sourcePath,
+    required String title,
+  }) {
+    return ImageCropper().cropImage(
+      sourcePath: sourcePath,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 90,
+      uiSettings: <PlatformUiSettings>[
+        AndroidUiSettings(
+          toolbarTitle: title,
+          lockAspectRatio: false,
+          hideBottomControls: false,
+        ),
+        IOSUiSettings(
+          title: title,
+          aspectRatioLockEnabled: false,
+          resetAspectRatioEnabled: true,
+          rotateButtonsHidden: false,
+          rotateClockwiseButtonHidden: false,
+        ),
+      ],
+    );
+  }
+}
+
+abstract class AndroidDocumentScanner {
+  Future<List<String>?> scanSinglePage();
+}
+
+class DefaultAndroidDocumentScanner implements AndroidDocumentScanner {
+  const DefaultAndroidDocumentScanner();
+
+  @override
+  Future<List<String>?> scanSinglePage() async {
+    final scanner = DocumentScanner(
+      options: DocumentScannerOptions(
+        pageLimit: 1,
+        documentFormats: const <DocumentFormat>{DocumentFormat.jpeg},
+        mode: ScannerMode.full,
+        isGalleryImport: false,
+      ),
+    );
+    try {
+      final result = await scanner.scanDocument();
+      final images = result.images ?? const <String>[];
+      if (images.isEmpty) {
+        return null;
+      }
+      return images;
+    } finally {
+      await scanner.close();
+    }
+  }
+}
+
+enum CardMediaPlatform { android, ios, unsupported }
+
 class CardMediaService {
-  CardMediaService({ImagePicker? imagePicker})
-    : _imagePicker = imagePicker ?? ImagePicker();
+  CardMediaService({
+    ImagePicker? imagePicker,
+    IosDocumentScanner? iosDocumentScanner,
+    CardMediaStoreDelegate? mediaStore,
+    CardPhotoEditor? photoEditor,
+    AndroidDocumentScanner? androidDocumentScanner,
+    CardMediaPlatform? platform,
+  }) : _imagePicker = imagePicker ?? ImagePicker(),
+       _iosDocumentScanner = iosDocumentScanner ?? IosDocumentScanner(),
+       _mediaStore = mediaStore ?? const DefaultCardMediaStoreDelegate(),
+       _photoEditor = photoEditor ?? const DefaultCardPhotoEditor(),
+       _androidDocumentScanner =
+           androidDocumentScanner ?? const DefaultAndroidDocumentScanner(),
+       _platform = platform ?? _detectPlatform();
 
   final ImagePicker _imagePicker;
-  final IosDocumentScanner _iosDocumentScanner = IosDocumentScanner();
+  final IosDocumentScanner _iosDocumentScanner;
+  final CardMediaStoreDelegate _mediaStore;
+  final CardPhotoEditor _photoEditor;
+  final AndroidDocumentScanner _androidDocumentScanner;
+  final CardMediaPlatform _platform;
+
+  static CardMediaPlatform _detectPlatform() {
+    if (Platform.isAndroid) {
+      return CardMediaPlatform.android;
+    }
+    if (Platform.isIOS) {
+      return CardMediaPlatform.ios;
+    }
+    return CardMediaPlatform.unsupported;
+  }
 
   Future<String?> capturePhoto({
     required String cardId,
@@ -27,7 +165,7 @@ class CardMediaService {
     if (picked == null) {
       return null;
     }
-    return media_store.storePickedImage(picked, cardId: cardId, side: side);
+    return _mediaStore.storePickedImage(picked, cardId: cardId, side: side);
   }
 
   Future<String?> selectPhoto({
@@ -41,7 +179,7 @@ class CardMediaService {
     if (picked == null) {
       return null;
     }
-    return media_store.storePickedImage(picked, cardId: cardId, side: side);
+    return _mediaStore.storePickedImage(picked, cardId: cardId, side: side);
   }
 
   Future<String?> editPhoto({
@@ -50,30 +188,15 @@ class CardMediaService {
     required String side,
   }) async {
     try {
-      final cropped = await ImageCropper().cropImage(
+      final cropped = await _photoEditor.cropImage(
         sourcePath: existingPath,
-        compressFormat: ImageCompressFormat.jpg,
-        compressQuality: 90,
-        uiSettings: <PlatformUiSettings>[
-          AndroidUiSettings(
-            toolbarTitle: 'Edit card photo',
-            lockAspectRatio: false,
-            hideBottomControls: false,
-          ),
-          IOSUiSettings(
-            title: 'Edit card photo',
-            aspectRatioLockEnabled: false,
-            resetAspectRatioEnabled: true,
-            rotateButtonsHidden: false,
-            rotateClockwiseButtonHidden: false,
-          ),
-        ],
+        title: 'Edit card photo',
       );
       if (cropped == null) {
         return null;
       }
       final bytes = await File(cropped.path).readAsBytes();
-      final storedPath = await media_store.storeImageBytes(
+      final storedPath = await _mediaStore.storeImageBytes(
         bytes,
         sourcePath: cropped.path,
         cardId: cardId,
@@ -108,7 +231,7 @@ class CardMediaService {
     }
     try {
       final bytes = await File(capture.file.path).readAsBytes();
-      return await media_store
+      return await _mediaStore
           .storeImageBytes(
             bytes,
             sourcePath: capture.file.path,
@@ -127,7 +250,7 @@ class CardMediaService {
   }
 
   Future<_SmartScanCapture?> _scanSinglePage() async {
-    if (Platform.isAndroid) {
+    if (_platform == CardMediaPlatform.android) {
       final scanned = await _tryAndroidDocumentScanner();
       switch (scanned.status) {
         case _SmartScanStatus.success:
@@ -140,7 +263,7 @@ class CardMediaService {
       }
     }
 
-    if (Platform.isIOS) {
+    if (_platform == CardMediaPlatform.ios) {
       final path = await _iosDocumentScanner.scanSinglePage();
       if (path == null) {
         return null;
@@ -152,17 +275,9 @@ class CardMediaService {
   }
 
   Future<_DocumentScannerResult> _tryAndroidDocumentScanner() async {
-    final scanner = DocumentScanner(
-      options: DocumentScannerOptions(
-        pageLimit: 1,
-        documentFormats: const <DocumentFormat>{DocumentFormat.jpeg},
-        mode: ScannerMode.full,
-        isGalleryImport: false,
-      ),
-    );
     try {
-      final result = await scanner.scanDocument();
-      final images = result.images ?? const <String>[];
+      final images =
+          await _androidDocumentScanner.scanSinglePage() ?? const <String>[];
       if (images.isEmpty) {
         return const _DocumentScannerResult.cancelled();
       }
@@ -180,15 +295,13 @@ class CardMediaService {
       return _DocumentScannerResult.failedToLaunch(error.message?.trim());
     } catch (error) {
       return _DocumentScannerResult.failedToLaunch(error.toString());
-    } finally {
-      await scanner.close();
     }
   }
 
   Future<_SmartScanCapture?> _captureAndCropSinglePage({
     String? noticeMessage,
   }) async {
-    if (Platform.isAndroid) {
+    if (_platform == CardMediaPlatform.android) {
       try {
         final picked = await _imagePicker.pickImage(
           source: ImageSource.camera,
@@ -198,17 +311,9 @@ class CardMediaService {
           return null;
         }
 
-        final cropped = await ImageCropper().cropImage(
+        final cropped = await _photoEditor.cropImage(
           sourcePath: picked.path,
-          compressFormat: ImageCompressFormat.jpg,
-          compressQuality: 92,
-          uiSettings: <PlatformUiSettings>[
-            AndroidUiSettings(
-              toolbarTitle: 'Smart scan card',
-              lockAspectRatio: false,
-              hideBottomControls: false,
-            ),
-          ],
+          title: 'Smart scan card',
         );
 
         if (cropped == null) {

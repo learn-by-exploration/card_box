@@ -8,13 +8,73 @@ import 'package:nfc_manager/nfc_manager_ios.dart';
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/nfc_scan_result.dart';
 
+abstract class NfcSessionClient {
+  Future<NfcAvailability> checkAvailability();
+
+  Future<void> startSession({
+    required Set<NfcPollingOption> pollingOptions,
+    required void Function(NfcTag tag) onDiscovered,
+    String? alertMessageIos,
+    void Function(NfcReaderSessionErrorIos error)? onSessionErrorIos,
+  });
+
+  Future<void> stopSession({String? alertMessageIos, String? errorMessageIos});
+}
+
+class DefaultNfcSessionClient implements NfcSessionClient {
+  const DefaultNfcSessionClient();
+
+  @override
+  Future<NfcAvailability> checkAvailability() {
+    return NfcManager.instance.checkAvailability();
+  }
+
+  @override
+  Future<void> startSession({
+    required Set<NfcPollingOption> pollingOptions,
+    required void Function(NfcTag tag) onDiscovered,
+    String? alertMessageIos,
+    void Function(NfcReaderSessionErrorIos error)? onSessionErrorIos,
+  }) {
+    return NfcManager.instance.startSession(
+      pollingOptions: pollingOptions,
+      alertMessageIos: alertMessageIos,
+      onSessionErrorIos: onSessionErrorIos,
+      onDiscovered: onDiscovered,
+    );
+  }
+
+  @override
+  Future<void> stopSession({String? alertMessageIos, String? errorMessageIos}) {
+    return NfcManager.instance.stopSession(
+      alertMessageIos: alertMessageIos,
+      errorMessageIos: errorMessageIos,
+    );
+  }
+}
+
 class NfcService {
+  NfcService({
+    NfcSessionClient? sessionClient,
+    Duration? sessionTimeout,
+    bool? isWeb,
+    TargetPlatform? platform,
+  }) : _sessionClient = sessionClient ?? const DefaultNfcSessionClient(),
+       _sessionTimeout = sessionTimeout ?? const Duration(seconds: 20),
+       _isWeb = isWeb ?? kIsWeb,
+       _platform = platform ?? defaultTargetPlatform;
+
+  final NfcSessionClient _sessionClient;
+  final Duration _sessionTimeout;
+  final bool _isWeb;
+  final TargetPlatform _platform;
+
   Future<NfcAvailability> checkAvailability() async {
-    if (kIsWeb) {
+    if (_isWeb) {
       return NfcAvailability.unsupported;
     }
     try {
-      return await NfcManager.instance.checkAvailability();
+      return await _sessionClient.checkAvailability();
     } on UnsupportedError {
       return NfcAvailability.unsupported;
     }
@@ -32,7 +92,7 @@ class NfcService {
 
     final completer = Completer<NfcScanResult>();
     try {
-      await NfcManager.instance.startSession(
+      await _sessionClient.startSession(
         pollingOptions: const {
           NfcPollingOption.iso14443,
           NfcPollingOption.iso15693,
@@ -75,7 +135,7 @@ class NfcService {
       );
 
       return completer.future.timeout(
-        const Duration(seconds: 20),
+        _sessionTimeout,
         onTimeout: () async {
           await _stopSessionSafely(
             errorMessageIos: 'Timed out waiting for a card.',
@@ -98,12 +158,12 @@ class NfcService {
   }
 
   Future<NfcScanResult> _buildResult(NfcTag tag) async {
-    return switch (defaultTargetPlatform) {
+    return switch (_platform) {
       TargetPlatform.android => _buildAndroidResult(tag),
       TargetPlatform.iOS => _buildIosResult(tag),
       _ => NfcScanResult(
         status: CompatibilityStatus.unsupported,
-        summary: 'NFC is not supported on ${defaultTargetPlatform.name}.',
+        summary: 'NFC is not supported on ${_platform.name}.',
         detail: 'No NFC summary is available on this platform.',
       ),
     };
@@ -303,7 +363,7 @@ class NfcService {
     String? errorMessageIos,
   }) async {
     try {
-      await NfcManager.instance.stopSession(
+      await _sessionClient.stopSession(
         alertMessageIos: alertMessageIos,
         errorMessageIos: errorMessageIos,
       );

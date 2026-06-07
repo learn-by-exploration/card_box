@@ -24,7 +24,7 @@ import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
 class EditCardScreen extends StatefulWidget {
-  const EditCardScreen({
+  EditCardScreen({
     super.key,
     required this.repository,
     required this.appLockService,
@@ -34,7 +34,12 @@ class EditCardScreen extends StatefulWidget {
     this.preset = AddCardPreset.general,
     this.recoveredMediaDraft,
     this.autoStartFrontScan = false,
-  });
+    CardMediaService? mediaService,
+    this.mediaManager = const DefaultCardMediaManager(),
+    VisitingCardOcrService? visitingCardOcrService,
+  }) : mediaService = mediaService ?? CardMediaService(),
+       visitingCardOcrService =
+           visitingCardOcrService ?? VisitingCardOcrService();
 
   final CardRepository repository;
   final AppLockService appLockService;
@@ -44,6 +49,9 @@ class EditCardScreen extends StatefulWidget {
   final AddCardPreset preset;
   final RecoveredMediaDraft? recoveredMediaDraft;
   final bool autoStartFrontScan;
+  final CardMediaService mediaService;
+  final CardMediaManager mediaManager;
+  final VisitingCardOcrService visitingCardOcrService;
 
   @override
   State<EditCardScreen> createState() => _EditCardScreenState();
@@ -62,9 +70,6 @@ class _EditCardScreenState extends State<EditCardScreen> {
   final _contactEmailsController = TextEditingController();
   final _contactWebsitesController = TextEditingController();
   final _contactAddressController = TextEditingController();
-  final _mediaService = CardMediaService();
-  final _mediaManager = const DefaultCardMediaManager();
-  final _visitingCardOcrService = VisitingCardOcrService();
 
   CardCategory _category = CardCategory.loyalty;
   String _selectedCategoryKey = CardCategory.loyalty.name;
@@ -501,7 +506,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
     }
     setState(() => _extractingDetails = true);
     try {
-      final extraction = await _visitingCardOcrService.extractFromImages(
+      final extraction = await widget.visitingCardOcrService.extractFromImages(
         frontImagePath: _frontImagePath,
         backImagePath: _backImagePath.trim().isEmpty ? null : _backImagePath,
       );
@@ -589,8 +594,14 @@ class _EditCardScreenState extends State<EditCardScreen> {
         existingCardId: widget.existingCard?.id,
       );
       final path = fromCamera
-          ? await _mediaService.capturePhoto(cardId: _draftCardId, side: side)
-          : await _mediaService.selectPhoto(cardId: _draftCardId, side: side);
+          ? await widget.mediaService.capturePhoto(
+              cardId: _draftCardId,
+              side: side,
+            )
+          : await widget.mediaService.selectPhoto(
+              cardId: _draftCardId,
+              side: side,
+            );
       if (path == null || !mounted) {
         return;
       }
@@ -677,7 +688,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
         side: side,
         existingCardId: widget.existingCard?.id,
       );
-      final result = await _mediaService.scanCardPhoto(
+      final result = await widget.mediaService.scanCardPhoto(
         cardId: _draftCardId,
         side: side,
       );
@@ -757,7 +768,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
     final previousBarcodeImagePath = _barcodeImagePath;
     var nextBarcodeImagePath = '';
     if (scannedCode.imageBytes != null && scannedCode.imageBytes!.isNotEmpty) {
-      nextBarcodeImagePath = await _mediaManager.storeImportedImage(
+      nextBarcodeImagePath = await widget.mediaManager.storeImportedImage(
         cardId: _draftCardId,
         side: 'barcode',
         bytes: scannedCode.imageBytes!,
@@ -793,7 +804,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
       }
     });
     try {
-      final editedPath = await _mediaService.editPhoto(
+      final editedPath = await widget.mediaService.editPhoto(
         existingPath: currentPath,
         cardId: _draftCardId,
         side: side,
@@ -1091,7 +1102,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
       _ => '',
     };
     if (path != initialPath) {
-      await _mediaManager.deleteImage(path);
+      await widget.mediaManager.deleteImage(path);
     }
   }
 
@@ -1099,14 +1110,14 @@ class _EditCardScreenState extends State<EditCardScreen> {
     final futures = <Future<void>>[];
     if (_frontImagePath.isNotEmpty &&
         _frontImagePath != _initialFrontImagePath) {
-      futures.add(_mediaManager.deleteImage(_frontImagePath));
+      futures.add(widget.mediaManager.deleteImage(_frontImagePath));
     }
     if (_backImagePath.isNotEmpty && _backImagePath != _initialBackImagePath) {
-      futures.add(_mediaManager.deleteImage(_backImagePath));
+      futures.add(widget.mediaManager.deleteImage(_backImagePath));
     }
     if (_barcodeImagePath.isNotEmpty &&
         _barcodeImagePath != _initialBarcodeImagePath) {
-      futures.add(_mediaManager.deleteImage(_barcodeImagePath));
+      futures.add(widget.mediaManager.deleteImage(_barcodeImagePath));
     }
     if (futures.isNotEmpty) {
       unawaited(Future.wait(futures));
