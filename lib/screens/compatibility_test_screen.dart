@@ -8,6 +8,7 @@ import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/device_settings_service.dart';
 import 'package:card_box/services/nfc_service.dart';
+import 'package:card_box/theme.dart';
 
 class CompatibilityTestScreen extends StatefulWidget {
   const CompatibilityTestScreen({
@@ -52,25 +53,30 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Compatibility test')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          tokens.spaceLarge,
+          tokens.spaceSmall,
+          tokens.spaceLarge,
+          tokens.spaceXLarge + tokens.spaceMedium,
+        ),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(tokens.spaceLarge),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.card.name,
-                    style: const TextStyle(
-                      fontSize: 20,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tokens.spaceSmall),
                   const Text(
                     'Not every RFID/NFC card can be read or emulated. This flow records what this phone can safely test.',
                   ),
@@ -78,9 +84,9 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           const _PermissionExplainer(),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           SwitchListTile.adaptive(
             title: const Text('Allow NFC test'),
             subtitle: const Text(
@@ -89,7 +95,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
             value: _nfcConsent,
             onChanged: (value) => setState(() => _nfcConsent = value),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: tokens.spaceSmall),
           _NfcPanel(
             loadingAvailability: _loadingAvailability,
             availability: _availability,
@@ -99,10 +105,10 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
             onOpenSettings: _openNfcSettings,
           ),
           if (_selectedStatus == CompatibilityStatus.androidHceCandidate) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.spaceMedium),
             const _EmulationNote(),
           ],
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           DropdownButtonFormField<CompatibilityStatus>(
             initialValue: _selectedStatus,
             decoration: const InputDecoration(
@@ -121,7 +127,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
               () => _selectedStatus = value ?? CompatibilityStatus.untested,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           TextFormField(
             controller: _summaryController,
             minLines: 3,
@@ -131,7 +137,7 @@ class _CompatibilityTestScreenState extends State<CompatibilityTestScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: tokens.spaceLarge + 2),
           FilledButton.icon(
             icon: const Icon(Icons.check),
             label: const Text('Save result'),
@@ -267,9 +273,10 @@ class _PermissionExplainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -280,28 +287,28 @@ class _PermissionExplainer extends StatelessWidget {
                 color: colors.primary,
               ),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: tokens.spaceMedium - 2),
             const _PermissionLine(
               icon: Icons.photo_camera,
               title: 'Camera',
               detail:
                   'Visible barcode or QR testing happens in the add or edit flow when you open the scanner.',
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             const _PermissionLine(
               icon: Icons.nfc,
               title: 'NFC on Android',
               detail:
                   'NFC is declared in the app manifest and depends on device support. Android usually does not show a separate runtime permission prompt for basic NFC tag reading.',
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             const _PermissionLine(
               icon: Icons.contactless,
               title: 'RFID note',
               detail:
                   'Many everyday RFID cards, especially low-frequency 125 kHz cards, cannot be read by normal phone NFC hardware at all. This is a hardware limit, not a missing permission.',
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             const _PermissionLine(
               icon: Icons.phone_iphone,
               title: 'iPhone note',
@@ -328,18 +335,24 @@ class _PermissionLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: 10),
+        Icon(icon, size: tokens.iconSmall),
+        SizedBox(width: tokens.spaceMedium - 2),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 2),
-              Text(detail, style: const TextStyle(fontSize: 13)),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: tokens.spaceXSmall / 2),
+              Text(detail, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),
@@ -367,6 +380,7 @@ class _NfcPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     final availabilityLabel = loadingAvailability
         ? 'Checking NFC availability...'
         : switch (availability) {
@@ -378,7 +392,7 @@ class _NfcPanel extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -386,9 +400,9 @@ class _NfcPanel extends StatelessWidget {
               'NFC reader',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             Text(availabilityLabel),
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.spaceMedium),
             FilledButton.icon(
               onPressed:
                   scanning ||
@@ -401,23 +415,23 @@ class _NfcPanel extends StatelessWidget {
               label: Text(scanning ? 'Scanning...' : 'Scan NFC card'),
             ),
             if (availability == NfcAvailability.disabled) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: tokens.spaceSmall),
               OutlinedButton.icon(
                 onPressed: () => onOpenSettings(),
                 icon: const Icon(Icons.settings_outlined),
                 label: const Text('Turn on NFC'),
               ),
-              const SizedBox(height: 6),
-              const Text(
+              SizedBox(height: tokens.spaceSmall - 2),
+              Text(
                 'Android does not show a normal runtime permission prompt for NFC. This opens the system NFC panel instead.',
-                style: TextStyle(fontSize: 12),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
             if (!consentGranted) ...[
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: tokens.spaceSmall),
+              Text(
                 'Turn on "Allow NFC test" before starting a scan.',
-                style: TextStyle(fontSize: 12),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ],
@@ -432,18 +446,21 @@ class _EmulationNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
               'Possible Android emulation candidate',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
-            SizedBox(height: 8),
-            Text(
+            SizedBox(height: tokens.spaceSmall),
+            const Text(
               'This card exposed ISO-DEP style behavior, which is the family Android Host Card Emulation works with. That does not mean the phone can replace this card today. It means the card is worth deeper Android-only investigation later.',
             ),
           ],

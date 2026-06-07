@@ -153,8 +153,7 @@ class CardTile extends StatelessWidget {
                   if ((onShowCode != null || onShowImages != null) &&
                       card.favorite)
                     SizedBox(width: tokens.spaceXSmall),
-                  if (card.favorite)
-                    Icon(Icons.star, size: tokens.iconSmall),
+                  if (card.favorite) Icon(Icons.star, size: tokens.iconSmall),
                 ],
               ),
               SizedBox(height: tokens.spaceMedium),

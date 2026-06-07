@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:card_box/models/visiting_card_extraction.dart';
 import 'package:card_box/screens/card_image_viewer_screen.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
 class VisitingCardReviewResult {
@@ -145,22 +146,30 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Review extracted details')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          tokens.spaceLarge,
+          tokens.spaceSmall,
+          tokens.spaceLarge,
+          tokens.spaceXLarge + tokens.spaceMedium,
+        ),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(tokens.spaceLarge),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Check each suggestion before saving',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tokens.spaceSmall),
                   const Text(
                     'Card Box pulled likely contact details from the card image. Keep the fields that look right and edit anything that needs correction.',
                   ),
@@ -168,33 +177,33 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           _PhotoPreviewRow(
             frontImagePath: widget.frontImagePath,
             backImagePath: widget.backImagePath,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           _SelectableField(
             label: 'Person name',
             value: _useName,
             controller: _nameController,
             onChanged: (value) => setState(() => _useName = value),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tokens.spaceMedium - 2),
           _SelectableField(
             label: 'Company',
             value: _useCompany,
             controller: _companyController,
             onChanged: (value) => setState(() => _useCompany = value),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tokens.spaceMedium - 2),
           _SelectableField(
             label: 'Title',
             value: _useTitle,
             controller: _titleController,
             onChanged: (value) => setState(() => _useTitle = value),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tokens.spaceMedium - 2),
           _SelectableField(
             label: 'Phone numbers',
             value: _usePhones,
@@ -204,7 +213,7 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
             helperText: 'One phone per line',
             onChanged: (value) => setState(() => _usePhones = value),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tokens.spaceMedium - 2),
           _SelectableField(
             label: 'Emails',
             value: _useEmails,
@@ -214,7 +223,7 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
             helperText: 'One email per line',
             onChanged: (value) => setState(() => _useEmails = value),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tokens.spaceMedium - 2),
           _SelectableField(
             label: 'Websites',
             value: _useWebsites,
@@ -224,7 +233,7 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
             helperText: 'One website per line',
             onChanged: (value) => setState(() => _useWebsites = value),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tokens.spaceMedium - 2),
           _SelectableField(
             label: 'Address',
             value: _useAddress,
@@ -233,7 +242,7 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
             maxLines: 4,
             onChanged: (value) => setState(() => _useAddress = value),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           TextFormField(
             controller: _rawOcrController,
             readOnly: true,
@@ -244,7 +253,7 @@ class _VisitingCardReviewScreenState extends State<VisitingCardReviewScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: tokens.spaceXLarge),
           FilledButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.check),
@@ -304,9 +313,10 @@ class _SelectableField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(tokens.spaceMedium),
         child: Column(
           children: [
             SwitchListTile.adaptive(
@@ -344,6 +354,7 @@ class _PhotoPreviewRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Row(
       children: [
         Expanded(
@@ -353,7 +364,7 @@ class _PhotoPreviewRow extends StatelessWidget {
             viewerTitle: 'Front image',
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: tokens.spaceMedium - 2),
         Expanded(
           child: _TappablePreviewImage(
             imagePath: backImagePath,
@@ -379,9 +390,10 @@ class _TappablePreviewImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     final canOpen = imagePath.trim().isNotEmpty;
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(tokens.radiusSmall),
       onTap: canOpen
           ? () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -408,18 +420,25 @@ class _TappablePreviewImage extends StatelessWidget {
                     color: Colors.black.withValues(alpha: 0.62),
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: tokens.spaceSmall,
+                      vertical: tokens.spaceXSmall,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.open_in_full, size: 14, color: Colors.white),
-                        SizedBox(width: 4),
+                        Icon(
+                          Icons.open_in_full,
+                          size: tokens.iconSmall - 4,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: tokens.spaceXSmall),
                         Text(
                           'Open',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

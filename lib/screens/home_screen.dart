@@ -238,10 +238,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           onPressed: () => _openCategoryPicker(allItems),
                           style: OutlinedButton.styleFrom(
                             padding: EdgeInsets.symmetric(
-                              horizontal: CardBoxThemeTokens.of(context)
-                                  .spaceMedium,
-                              vertical: CardBoxThemeTokens.of(context)
-                                  .spaceMedium,
+                              horizontal: CardBoxThemeTokens.of(
+                                context,
+                              ).spaceMedium,
+                              vertical: CardBoxThemeTokens.of(
+                                context,
+                              ).spaceMedium,
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(
@@ -256,8 +258,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 size: CardBoxThemeTokens.of(context).iconSmall,
                               ),
                               SizedBox(
-                                width: CardBoxThemeTokens.of(context)
-                                    .spaceMedium - 2,
+                                width:
+                                    CardBoxThemeTokens.of(context).spaceMedium -
+                                    2,
                               ),
                               Expanded(
                                 child: Column(
@@ -271,8 +274,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ).textTheme.labelSmall,
                                     ),
                                     SizedBox(
-                                      height: CardBoxThemeTokens.of(context)
-                                              .spaceXSmall /
+                                      height:
+                                          CardBoxThemeTokens.of(
+                                            context,
+                                          ).spaceXSmall /
                                           2,
                                     ),
                                     Text(
@@ -290,8 +295,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               SizedBox(
-                                width:
-                                    CardBoxThemeTokens.of(context).spaceSmall,
+                                width: CardBoxThemeTokens.of(
+                                  context,
+                                ).spaceSmall,
                               ),
                               const Icon(Icons.keyboard_arrow_down_rounded),
                             ],

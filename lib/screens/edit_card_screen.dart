@@ -20,6 +20,7 @@ import 'package:card_box/services/card_media_service.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/visiting_card_ocr_service.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
 class EditCardScreen extends StatefulWidget {
@@ -1121,12 +1122,19 @@ class _PermissionNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+        Icon(
+          icon,
+          size: tokens.iconMedium,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        SizedBox(width: tokens.spaceSmall),
+        Expanded(
+          child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+        ),
       ],
     );
   }
@@ -1140,17 +1148,23 @@ class _MetadataHintCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(tokens.spaceMedium),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: tokens.spaceSmall),
             for (final line in lines)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: EdgeInsets.only(bottom: tokens.spaceXSmall),
                 child: Text(line),
               ),
           ],
@@ -1167,37 +1181,40 @@ class _AddFlowGuide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'How to add a card',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 10),
-            Text(_introText(), style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 10),
+            SizedBox(height: tokens.spaceMedium - 2),
+            Text(_introText(), style: Theme.of(context).textTheme.bodySmall),
+            SizedBox(height: tokens.spaceMedium - 2),
             const _GuideLine(
               step: '1',
               text: 'Enter the card name and category first.',
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             const _GuideLine(
               step: '2',
               text:
                   'Scan the front and back for cleaner edges, or add photos if that is easier.',
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             const _GuideLine(
               step: '3',
               text: 'Scan a visible barcode or QR code if the card has one.',
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             _GuideLine(step: '4', text: _stepFourText()),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             const _GuideLine(
               step: '5',
               text:
@@ -1244,6 +1261,7 @@ class _GuideLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1253,14 +1271,16 @@ class _GuideLine extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(tokens.radiusSmall - 2),
           ),
           child: Text(
             step,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: tokens.spaceMedium - 2),
         Expanded(child: Text(text)),
       ],
     );
@@ -1290,17 +1310,23 @@ class _PhotoEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     final canOpen = imagePath.trim().isNotEmpty;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(tokens.spaceMedium),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 10),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: tokens.spaceMedium - 2),
             InkWell(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(tokens.radiusSmall),
               onTap: canOpen
                   ? () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -1361,7 +1387,7 @@ class _PhotoEditor extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: tokens.spaceMedium - 2),
             Wrap(
               spacing: 8,
               runSpacing: 8,

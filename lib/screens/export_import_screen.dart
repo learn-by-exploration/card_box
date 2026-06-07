@@ -6,6 +6,7 @@ import 'package:card_box/services/backup_crypto_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/file_share_service.dart';
+import 'package:card_box/theme.dart';
 
 class ExportImportScreen extends StatefulWidget {
   const ExportImportScreen({
@@ -32,26 +33,34 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Export and import')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          tokens.spaceLarge,
+          tokens.spaceSmall,
+          tokens.spaceLarge,
+          tokens.spaceXLarge + tokens.spaceMedium,
+        ),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(tokens.spaceLarge),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Device backup',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tokens.spaceSmall),
                   const Text(
                     'Card Box keeps data local. Create a real backup file that includes card data and saved photos. On mobile, Card Box also opens the system share sheet so you can save or send the backup right away. Use encrypted backup when you want password protection for the exported file.',
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: tokens.spaceMedium),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -81,25 +90,27 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
             ),
           ),
           if (_latestBackup != null) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.spaceMedium),
             _BackupSummaryCard(backup: _latestBackup!),
           ],
-          const SizedBox(height: 18),
+          SizedBox(height: tokens.spaceLarge + 2),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(tokens.spaceLarge),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Import backup file',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tokens.spaceSmall),
                   const Text(
                     'Choose a Card Box backup file from the native file picker. Matching card IDs are updated; missing ones are added.',
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: tokens.spaceMedium),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.folder_open),
                     label: Text(
@@ -112,8 +123,13 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
             ),
           ),
           if (_message.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(_message, style: const TextStyle(fontWeight: FontWeight.w600)),
+            SizedBox(height: tokens.spaceMedium),
+            Text(
+              _message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ],
         ],
       ),
@@ -316,13 +332,14 @@ class _PasswordPromptSheetState extends State<_PasswordPromptSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 8,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+        left: tokens.spaceLarge,
+        right: tokens.spaceLarge,
+        top: tokens.spaceSmall,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + tokens.spaceLarge,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,9 +355,9 @@ class _PasswordPromptSheetState extends State<_PasswordPromptSheet> {
                       widget.title,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: tokens.spaceSmall),
                     Text(widget.helperText),
-                    const SizedBox(height: 16),
+                    SizedBox(height: tokens.spaceLarge),
                     TextFormField(
                       controller: _passwordController,
                       decoration: const InputDecoration(
@@ -358,7 +375,7 @@ class _PasswordPromptSheetState extends State<_PasswordPromptSheet> {
                       },
                     ),
                     if (widget.confirmPassword) ...[
-                      const SizedBox(height: 12),
+                      SizedBox(height: tokens.spaceMedium),
                       TextFormField(
                         controller: _confirmController,
                         decoration: const InputDecoration(
@@ -379,7 +396,7 @@ class _PasswordPromptSheetState extends State<_PasswordPromptSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: tokens.spaceLarge),
           Row(
             children: [
               Expanded(
@@ -388,7 +405,7 @@ class _PasswordPromptSheetState extends State<_PasswordPromptSheet> {
                   child: const Text('Cancel'),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: tokens.spaceMedium),
               Expanded(
                 child: FilledButton(
                   onPressed: () {
@@ -415,17 +432,20 @@ class _BackupSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Latest backup',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: tokens.spaceMedium - 2),
             _SummaryRow(label: 'File', value: backup.fileName),
             _SummaryRow(label: 'Cards', value: '${backup.cardCount}'),
             _SummaryRow(
@@ -448,16 +468,19 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: tokens.spaceSmall),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: tokens.spaceXSmall / 2),
           SelectableText(value),
         ],
       ),

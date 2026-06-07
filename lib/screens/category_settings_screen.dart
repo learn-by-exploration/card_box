@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:card_box/models/card_category.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/category_service.dart';
+import 'package:card_box/theme.dart';
 
 class CategorySettingsScreen extends StatelessWidget {
   const CategorySettingsScreen({
@@ -19,6 +20,7 @@ class CategorySettingsScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: Listenable.merge([categoryService, repository]),
       builder: (context, _) {
+        final tokens = CardBoxThemeTokens.of(context);
         final customCategories = categoryService.customCategories;
         return Scaffold(
           appBar: AppBar(title: const Text('Categories')),
@@ -28,19 +30,26 @@ class CategorySettingsScreen extends StatelessWidget {
             label: const Text('Add category'),
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            padding: EdgeInsets.fromLTRB(
+              tokens.spaceLarge,
+              tokens.spaceSmall,
+              tokens.spaceLarge,
+              96,
+            ),
             children: [
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(tokens.spaceLarge),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Built-in categories',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: tokens.spaceSmall),
                       Text(
                         CardCategory.values
                             .where(
@@ -51,7 +60,7 @@ class CategorySettingsScreen extends StatelessWidget {
                             .map((category) => category.label)
                             .join(', '),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: tokens.spaceMedium - 2),
                       Text(
                         'Custom categories extend these. Built-ins stay fixed so the app remains predictable.',
                         style: Theme.of(context).textTheme.bodySmall,
@@ -60,18 +69,20 @@ class CategorySettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: tokens.spaceMedium),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(tokens.spaceLarge),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Custom categories',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: tokens.spaceSmall),
                       if (customCategories.isEmpty)
                         const Text(
                           'Create custom categories here so they show up directly in the card picker.',

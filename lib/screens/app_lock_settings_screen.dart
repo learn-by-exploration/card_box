@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:card_box/services/app_lock_service.dart';
+import 'package:card_box/theme.dart';
 
 class AppLockSettingsScreen extends StatefulWidget {
   const AppLockSettingsScreen({super.key, required this.appLockService});
@@ -25,22 +26,30 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final appLock = widget.appLockService;
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('App lock')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          tokens.spaceLarge,
+          tokens.spaceSmall,
+          tokens.spaceLarge,
+          tokens.spaceXLarge + tokens.spaceMedium,
+        ),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(tokens.spaceLarge),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Protect your wallet',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tokens.spaceSmall),
                   Text(
                     appLock.lockEnabled
                         ? 'Card Box is locked with your app PIN${appLock.biometricEnabled ? ' and biometrics' : ''}.'
@@ -50,7 +59,7 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spaceMedium),
           if (!appLock.lockEnabled)
             _SetupLockCard(
               biometricAvailable: appLock.biometricAvailable,
@@ -77,19 +86,19 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
               value: _lockOnResume,
               onChanged: (value) => setState(() => _lockOnResume = value),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.spaceMedium),
             FilledButton.icon(
               onPressed: _saveSettings,
               icon: const Icon(Icons.save),
               label: const Text('Save lock settings'),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             OutlinedButton.icon(
               onPressed: _changePin,
               icon: const Icon(Icons.pin),
               label: const Text('Change PIN'),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             OutlinedButton.icon(
               onPressed: _disableLock,
               icon: const Icon(Icons.lock_open),
