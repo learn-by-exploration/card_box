@@ -10,17 +10,21 @@ import 'package:card_box/screens/archived_cards_screen.dart';
 import 'package:card_box/screens/app_lock_settings_screen.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
+import 'package:card_box/screens/card_search_screen.dart';
 import 'package:card_box/screens/card_reference_present_screen.dart';
 import 'package:card_box/screens/category_settings_screen.dart';
 import 'package:card_box/screens/compatibility_test_screen.dart';
 import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/screens/edit_card_screen.dart';
 import 'package:card_box/screens/export_import_screen.dart';
+import 'package:card_box/screens/theme_settings_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_share_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
+import 'package:card_box/services/theme_service.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/card_tile.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -29,6 +33,7 @@ class HomeScreen extends StatefulWidget {
     required this.repository,
     required this.appLockService,
     required this.categoryService,
+    required this.themeService,
     required this.mediaRecoveryService,
     required this.onRecoveredMediaDiscarded,
     required this.onRecoveredMediaUsed,
@@ -38,6 +43,7 @@ class HomeScreen extends StatefulWidget {
   final CardRepository repository;
   final AppLockService appLockService;
   final CategoryService categoryService;
+  final ThemeService themeService;
   final MediaRecoveryService mediaRecoveryService;
   final RecoveredMediaDraft? recoveredMediaDraft;
   final Future<void> Function() onRecoveredMediaDiscarded;
@@ -49,8 +55,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const _layoutPreferenceKey = 'card_box.home_layout.v1';
+  static const _allCategoriesFilterKey = '__all__';
 
-  String _query = '';
   String? _categoryKey;
   _BrowseMode _browseMode = _BrowseMode.cards;
   _CardLayoutMode _layoutMode = _CardLayoutMode.list;
@@ -59,6 +65,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadLayoutPreference();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
@@ -112,6 +123,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icon(Icons.space_dashboard_outlined, size: 18),
                         SizedBox(width: 10),
                         Text('Wallet summary'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: _HomeMenuAction.theme,
+                    child: Row(
+                      children: [
+                        Icon(Icons.palette_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('Theme'),
                       ],
                     ),
                   ),
@@ -173,15 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                TextField(
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText:
-                        'Search names, companies, notes, barcodes, or contact details',
-                  ),
-                  onChanged: (value) => setState(() => _query = value),
-                ),
-                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: SegmentedButton<_BrowseMode>(
@@ -219,24 +231,89 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 if (_browseMode == _BrowseMode.cards) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: DropdownButtonFormField<String?>(
-                      initialValue: _categoryKey,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('All categories'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _openCategoryPicker(allItems),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: CardBoxThemeTokens.of(context)
+                                  .spaceMedium,
+                              vertical: CardBoxThemeTokens.of(context)
+                                  .spaceMedium,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                CardBoxThemeTokens.of(context).radiusMedium,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                size: CardBoxThemeTokens.of(context).iconSmall,
+                              ),
+                              SizedBox(
+                                width: CardBoxThemeTokens.of(context)
+                                    .spaceMedium - 2,
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Category',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.labelSmall,
+                                    ),
+                                    SizedBox(
+                                      height: CardBoxThemeTokens.of(context)
+                                              .spaceXSmall /
+                                          2,
+                                    ),
+                                    Text(
+                                      _selectedCategoryLabel(allItems),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                width:
+                                    CardBoxThemeTokens.of(context).spaceSmall,
+                              ),
+                              const Icon(Icons.keyboard_arrow_down_rounded),
+                            ],
+                          ),
                         ),
-                        ..._categoryFilterEntries(allItems),
+                      ),
+                      if (_categoryKey != null) ...[
+                        const SizedBox(width: 10),
+                        ActionChip(
+                          avatar: const Icon(Icons.close, size: 16),
+                          label: const Text('Clear'),
+                          onPressed: () => setState(() => _categoryKey = null),
+                        ),
                       ],
-                      onChanged: (value) =>
-                          setState(() => _categoryKey = value),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _categoryKey == null
+                        ? 'Showing every category.'
+                        : 'Showing only ${_selectedCategoryLabel(allItems)}.',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
                 ] else ...[
@@ -266,27 +343,103 @@ class _HomeScreenState extends State<HomeScreen> {
                     cards: cards,
                     layoutMode: _layoutMode,
                     onTapCard: _openCardActions,
+                    onShowCode: _showCardCode,
+                    onShowImages: _showCardImages,
                   ),
                 ],
               ],
             ),
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            icon: Icon(
-              _browseMode == _BrowseMode.cards
-                  ? Icons.add
-                  : Icons.contact_page_outlined,
-            ),
-            label: Text(
-              _browseMode == _BrowseMode.cards ? 'Add card' : 'Add contact',
-            ),
-            onPressed: _browseMode == _BrowseMode.cards
-                ? _openAddCardPicker
-                : _openContactAddPicker,
+          floatingActionButton: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'search_fab',
+                tooltip: 'Search cards',
+                onPressed: _openSearch,
+                child: const Icon(Icons.search),
+              ),
+              const SizedBox(height: 12),
+              FloatingActionButton.extended(
+                heroTag: 'add_fab',
+                icon: Icon(
+                  _browseMode == _BrowseMode.cards
+                      ? Icons.add
+                      : Icons.contact_page_outlined,
+                ),
+                label: Text(
+                  _browseMode == _BrowseMode.cards ? 'Add card' : 'Add contact',
+                ),
+                onPressed: _browseMode == _BrowseMode.cards
+                    ? _openAddCardPicker
+                    : _openContactAddPicker,
+              ),
+            ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _openCategoryPicker(List<WalletCard> cards) async {
+    final options = _categoryFilterOptions(cards);
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Filter by category',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Choose the kind of card you want to browse right now.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      _CategoryOptionTile(
+                        label: 'All categories',
+                        count: cards
+                            .where((card) => !card.isVisitingCard)
+                            .length,
+                        selected: _categoryKey == null,
+                        onTap: () =>
+                            Navigator.of(context).pop(_allCategoriesFilterKey),
+                      ),
+                      for (final option in options)
+                        _CategoryOptionTile(
+                          label: option.label,
+                          count: option.count,
+                          selected: _categoryKey == option.key,
+                          onTap: () => Navigator.of(context).pop(option.key),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _categoryKey = selected == _allCategoriesFilterKey ? null : selected;
+    });
   }
 
   Future<void> _loadLayoutPreference() async {
@@ -309,6 +462,21 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _layoutMode = nextMode);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_layoutPreferenceKey, nextMode.name);
+  }
+
+  Future<void> _openSearch() async {
+    final result = await Navigator.of(context).push<WalletCard>(
+      MaterialPageRoute(
+        builder: (_) => CardSearchScreen(
+          repository: widget.repository,
+          showContactsInitially: _browseMode == _BrowseMode.contacts,
+        ),
+      ),
+    );
+    if (result == null || !mounted) {
+      return;
+    }
+    await _openCardActions(result);
   }
 
   void _openAddCard(AddCardPreset preset, {bool autoStartFrontScan = false}) {
@@ -610,6 +778,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         );
+      case _HomeMenuAction.theme:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ThemeSettingsScreen(themeService: widget.themeService),
+          ),
+        );
       case _HomeMenuAction.backup:
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -630,7 +805,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<WalletCard> _filteredCards(List<WalletCard> cards) {
-    final normalizedQuery = _query.trim().toLowerCase();
     final filtered = cards.where((card) {
       final browseMatches = switch (_browseMode) {
         _BrowseMode.cards => !card.isVisitingCard,
@@ -639,22 +813,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final categoryMatches = _browseMode == _BrowseMode.contacts
           ? true
           : _matchesSelectedCategory(card);
-      final queryMatches =
-          normalizedQuery.isEmpty ||
-          [
-            card.name,
-            card.issuer,
-            card.categoryLabel,
-            card.notes,
-            card.barcodePayload,
-            card.contactTitle,
-            card.contactAddress,
-            ...card.contactPhones,
-            ...card.contactEmails,
-            ...card.contactWebsites,
-            card.rawOcrText,
-          ].any((value) => value.toLowerCase().contains(normalizedQuery));
-      return browseMatches && categoryMatches && queryMatches;
+      return browseMatches && categoryMatches;
     }).toList();
     filtered.sort((a, b) {
       if (a.favorite != b.favorite) {
@@ -681,12 +840,23 @@ class _HomeScreenState extends State<HomeScreen> {
     return card.category.name == _categoryKey;
   }
 
-  List<DropdownMenuItem<String?>> _categoryFilterEntries(
-    List<WalletCard> cards,
-  ) {
+  String _selectedCategoryLabel(List<WalletCard> cards) {
+    if (_categoryKey == null) {
+      return 'All categories';
+    }
+    for (final option in _categoryFilterOptions(cards)) {
+      if (option.key == _categoryKey) {
+        return option.label;
+      }
+    }
+    return 'Selected category';
+  }
+
+  List<_CategoryFilterOption> _categoryFilterOptions(List<WalletCard> cards) {
+    final cardItems = cards.where((card) => !card.isVisitingCard).toList();
     final customLabels = <String>{
       ...widget.categoryService.customCategories,
-      ...cards
+      ...cardItems
           .where((card) => card.category == CardCategory.other)
           .map((card) => card.customCategory?.trim() ?? '')
           .where((label) => label.isNotEmpty),
@@ -695,15 +865,23 @@ class _HomeScreenState extends State<HomeScreen> {
       ...CardCategory.values
           .where((category) => category != CardCategory.contact)
           .map(
-            (category) => DropdownMenuItem<String?>(
-              value: category.name,
-              child: Text(category.label),
+            (category) => _CategoryFilterOption(
+              key: category.name,
+              label: category.label,
+              count: cardItems
+                  .where((card) => card.category == category)
+                  .length,
             ),
           ),
       ...customLabels.map(
-        (label) => DropdownMenuItem<String?>(
-          value: 'custom:$label',
-          child: Text(label),
+        (label) => _CategoryFilterOption(
+          key: 'custom:$label',
+          label: label,
+          count: cardItems.where((card) {
+            return card.category == CardCategory.other &&
+                card.customCategory?.trim().toLowerCase() ==
+                    label.toLowerCase();
+          }).length,
         ),
       ),
     ];
@@ -753,6 +931,18 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _CompactOverviewPanel(cards: widget.repository.cards),
         ),
       ),
+    );
+  }
+
+  Future<void> _showCardCode(WalletCard card) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card)));
+  }
+
+  Future<void> _showCardImages(WalletCard card) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CardReferencePresentScreen(card: card)),
     );
   }
 
@@ -825,18 +1015,103 @@ enum _BrowseMode { cards, contacts }
 
 enum _CardLayoutMode { list, grid }
 
-enum _HomeMenuAction { archived, summary, categories, backup, lock }
+enum _HomeMenuAction { archived, summary, theme, categories, backup, lock }
+
+class _CategoryFilterOption {
+  const _CategoryFilterOption({
+    required this.key,
+    required this.label,
+    required this.count,
+  });
+
+  final String key;
+  final String label;
+  final int count;
+}
+
+class _CategoryOptionTile extends StatelessWidget {
+  const _CategoryOptionTile({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected ? tokens.surfaceInteractive : tokens.surfaceSubtle,
+        borderRadius: BorderRadius.circular(tokens.radiusMedium),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(tokens.radiusMedium),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? colors.primary.withValues(alpha: 0.12)
+                        : tokens.surfaceRaised,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.chevron_right_rounded,
+                  color: selected ? colors.primary : colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _CardCollection extends StatelessWidget {
   const _CardCollection({
     required this.cards,
     required this.layoutMode,
     required this.onTapCard,
+    required this.onShowCode,
+    required this.onShowImages,
   });
 
   final List<WalletCard> cards;
   final _CardLayoutMode layoutMode;
   final ValueChanged<WalletCard> onTapCard;
+  final ValueChanged<WalletCard> onShowCode;
+  final ValueChanged<WalletCard> onShowImages;
 
   @override
   Widget build(BuildContext context) {
@@ -844,7 +1119,16 @@ class _CardCollection extends StatelessWidget {
       return Column(
         children: [
           for (var index = 0; index < cards.length; index++) ...[
-            CardTile(card: cards[index], onTap: () => onTapCard(cards[index])),
+            CardTile(
+              card: cards[index],
+              onTap: () => onTapCard(cards[index]),
+              onShowCode: cards[index].hasBarcode
+                  ? () => onShowCode(cards[index])
+                  : null,
+              onShowImages: cards[index].hasPhotos
+                  ? () => onShowImages(cards[index])
+                  : null,
+            ),
             if (index != cards.length - 1) const SizedBox(height: 10),
           ],
         ],
@@ -865,7 +1149,7 @@ class _CardCollection extends StatelessWidget {
         crossAxisCount: crossAxisCount,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 0.98,
+        childAspectRatio: 0.9,
       ),
       itemBuilder: (context, index) {
         final card = cards[index];
@@ -873,6 +1157,8 @@ class _CardCollection extends StatelessWidget {
           card: card,
           layout: CardTileLayout.grid,
           onTap: () => onTapCard(card),
+          onShowCode: card.hasBarcode ? () => onShowCode(card) : null,
+          onShowImages: card.hasPhotos ? () => onShowImages(card) : null,
         );
       },
     );
@@ -984,23 +1270,30 @@ class _MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.spaceMedium,
+        vertical: tokens.spaceSmall + 2,
+      ),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(8),
+        color: tokens.surfaceSubtle,
+        borderRadius: BorderRadius.circular(tokens.radiusSmall),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: colors.primary),
-          const SizedBox(height: 8),
+          Icon(
+            icon,
+            size: tokens.iconSmall,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          SizedBox(height: tokens.spaceSmall),
           Text(
             value,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: tokens.spaceXSmall / 2),
           Text(label, style: const TextStyle(fontSize: 12)),
         ],
       ),

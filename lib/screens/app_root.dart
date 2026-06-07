@@ -7,6 +7,8 @@ import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
+import 'package:card_box/services/theme_service.dart';
+import 'package:card_box/theme.dart';
 
 class AppRoot extends StatefulWidget {
   const AppRoot({
@@ -14,6 +16,7 @@ class AppRoot extends StatefulWidget {
     required this.repository,
     required this.appLockService,
     required this.categoryService,
+    required this.themeService,
     required this.mediaRecoveryService,
     this.recoveredMediaDraft,
   });
@@ -21,6 +24,7 @@ class AppRoot extends StatefulWidget {
   final CardRepository repository;
   final AppLockService appLockService;
   final CategoryService categoryService;
+  final ThemeService themeService;
   final MediaRecoveryService mediaRecoveryService;
   final RecoveredMediaDraft? recoveredMediaDraft;
 
@@ -89,6 +93,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
                 repository: widget.repository,
                 appLockService: widget.appLockService,
                 categoryService: widget.categoryService,
+                themeService: widget.themeService,
                 mediaRecoveryService: widget.mediaRecoveryService,
                 recoveredMediaDraft: _recoveredMediaDraft,
                 onRecoveredMediaUsed: _clearRecoveredMedia,
@@ -98,7 +103,8 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
           fit: StackFit.expand,
           children: [
             child,
-            if (_obscureContent) const ColoredBox(color: Color(0xFF0F1713)),
+            if (_obscureContent)
+              ColoredBox(color: CardBoxThemeTokens.of(context).appObscureScrim),
           ],
         );
       },

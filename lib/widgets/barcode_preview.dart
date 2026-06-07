@@ -1,6 +1,7 @@
 import 'package:barcode/barcode.dart' as barcode_package;
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:card_box/theme.dart';
 
 class BarcodePreview extends StatelessWidget {
   const BarcodePreview({
@@ -19,6 +20,7 @@ class BarcodePreview extends StatelessWidget {
     if (data.trim().isEmpty) {
       return const SizedBox.shrink();
     }
+    final tokens = CardBoxThemeTokens.of(context);
     final barcode = _barcodeForFormat(format);
     return BarcodeWidget(
       data: data,
@@ -33,7 +35,7 @@ class BarcodePreview extends StatelessWidget {
           ),
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: tokens.presentationSurface,
       height: height,
     );
   }

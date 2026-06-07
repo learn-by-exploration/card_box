@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:card_box/models/wallet_card.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 
 class BarcodePresentScreen extends StatelessWidget {
@@ -10,12 +11,18 @@ class BarcodePresentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(backgroundColor: Colors.white, title: Text(card.name)),
+      backgroundColor: tokens.presentationCanvas,
+      appBar: AppBar(
+        backgroundColor: tokens.presentationCanvas,
+        foregroundColor: colors.onSurface,
+        title: Text(card.name),
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(tokens.spaceXLarge),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -28,21 +35,21 @@ class BarcodePresentScreen extends StatelessWidget {
                 ),
               ),
               if (card.issuer.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                SizedBox(height: tokens.spaceSmall - 2),
                 Text(
                   card.issuer,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 16),
                 ),
               ],
-              const SizedBox(height: 28),
+              SizedBox(height: tokens.spaceXLarge + tokens.spaceSmall),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(tokens.spaceXLarge),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFD8DEDC)),
-                    borderRadius: BorderRadius.circular(8),
+                    color: tokens.presentationSurface,
+                    border: Border.all(color: tokens.borderSoft),
+                    borderRadius: BorderRadius.circular(tokens.radiusSmall),
                   ),
                   child: Center(
                     child: BarcodePreview(
@@ -53,7 +60,7 @@ class BarcodePresentScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: tokens.spaceLarge),
               SelectableText(
                 card.barcodePayload,
                 textAlign: TextAlign.center,
@@ -62,7 +69,7 @@ class BarcodePresentScreen extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: tokens.spaceSmall),
               Text(
                 card.barcodeFormat.isEmpty ? 'Stored code' : card.barcodeFormat,
                 textAlign: TextAlign.center,

@@ -13,6 +13,8 @@ import 'package:card_box/services/card_media_manager.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/device_auth_service.dart';
 import 'package:card_box/services/secure_store.dart';
+import 'package:card_box/services/theme_service.dart';
+import 'package:card_box/theme.dart';
 
 class MemorySecureStore implements SecureStore {
   final Map<String, String> _values = <String, String>{};
@@ -185,10 +187,37 @@ Future<CategoryService> createReadyCategoryService({
   return service;
 }
 
+Future<ThemeService> createReadyThemeService({
+  SharedPreferences? preferences,
+  ThemeMode initialMode = ThemeMode.system,
+}) async {
+  final storedMode = switch (initialMode) {
+    ThemeMode.light => 'light',
+    ThemeMode.dark => 'dark',
+    ThemeMode.system => 'system',
+  };
+  if (preferences == null) {
+    SharedPreferences.setMockInitialValues({
+      ThemeService.themeModeKey: storedMode,
+    });
+  }
+  final prefs = preferences ?? await SharedPreferences.getInstance();
+  if (preferences != null) {
+    await prefs.setString(ThemeService.themeModeKey, storedMode);
+  }
+  final service = ThemeService(preferences: prefs);
+  await service.init();
+  return service;
+}
+
 CardDatabase createInMemoryDatabase() => CardDatabase.inMemory();
 
 Widget wrapForTest(Widget child) {
-  return MaterialApp(home: child);
+  return MaterialApp(
+    theme: cardBoxLightTheme,
+    darkTheme: cardBoxDarkTheme,
+    home: child,
+  );
 }
 
 Future<Directory> createTempDir(String name) async {

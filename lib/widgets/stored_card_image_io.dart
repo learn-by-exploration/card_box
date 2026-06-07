@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:card_box/theme.dart';
 
 Widget buildStoredCardImage(
   BuildContext context, {
@@ -14,7 +15,9 @@ Widget buildStoredCardImage(
   }
   final file = File(path);
   return ClipRRect(
-    borderRadius: BorderRadius.circular(8),
+    borderRadius: BorderRadius.circular(
+      CardBoxThemeTokens.of(context).radiusSmall,
+    ),
     child: Image.file(
       file,
       height: height,
@@ -32,13 +35,14 @@ class _EmptyImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Container(
       height: height,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFD8DEDC)),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.white,
+        border: Border.all(color: tokens.borderSoft),
+        borderRadius: BorderRadius.circular(tokens.radiusSmall),
+        color: tokens.surfaceRaised,
       ),
       child: Text(label, textAlign: TextAlign.center),
     );

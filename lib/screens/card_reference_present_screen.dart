@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:card_box/models/wallet_card.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
 class CardReferencePresentScreen extends StatefulWidget {
@@ -40,8 +41,9 @@ class _CardReferencePresentScreenState
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F0D),
+      backgroundColor: tokens.appObscureScrim,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,

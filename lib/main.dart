@@ -7,6 +7,7 @@ import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
+import 'package:card_box/services/theme_service.dart';
 import 'package:card_box/theme.dart';
 
 void main() async {
@@ -15,6 +16,8 @@ void main() async {
   final mediaRecoveryService = MediaRecoveryService(preferences: preferences);
   final categoryService = CategoryService(preferences: preferences);
   await categoryService.init();
+  final themeService = ThemeService(preferences: preferences);
+  await themeService.init();
   final repository = CardRepository(
     seedDemoCards: const bool.fromEnvironment('CARD_BOX_SEED_DEMOS'),
     legacyPreferences: preferences,
@@ -29,6 +32,7 @@ void main() async {
       repository: repository,
       appLockService: appLockService,
       categoryService: categoryService,
+      themeService: themeService,
       mediaRecoveryService: mediaRecoveryService,
       recoveredMediaDraft: recoveredMediaDraft,
     ),
@@ -41,6 +45,7 @@ class CardBoxApp extends StatelessWidget {
     required this.repository,
     required this.appLockService,
     required this.categoryService,
+    required this.themeService,
     required this.mediaRecoveryService,
     this.recoveredMediaDraft,
   });
@@ -48,21 +53,28 @@ class CardBoxApp extends StatelessWidget {
   final CardRepository repository;
   final AppLockService appLockService;
   final CategoryService categoryService;
+  final ThemeService themeService;
   final MediaRecoveryService mediaRecoveryService;
   final RecoveredMediaDraft? recoveredMediaDraft;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Card Box',
-      theme: cardBoxTheme,
-      debugShowCheckedModeBanner: false,
-      home: AppRoot(
-        repository: repository,
-        appLockService: appLockService,
-        categoryService: categoryService,
-        mediaRecoveryService: mediaRecoveryService,
-        recoveredMediaDraft: recoveredMediaDraft,
+    return AnimatedBuilder(
+      animation: themeService,
+      builder: (context, _) => MaterialApp(
+        title: 'Card Box',
+        theme: cardBoxLightTheme,
+        darkTheme: cardBoxDarkTheme,
+        themeMode: themeService.themeMode,
+        debugShowCheckedModeBanner: false,
+        home: AppRoot(
+          repository: repository,
+          appLockService: appLockService,
+          categoryService: categoryService,
+          themeService: themeService,
+          mediaRecoveryService: mediaRecoveryService,
+          recoveredMediaDraft: recoveredMediaDraft,
+        ),
       ),
     );
   }

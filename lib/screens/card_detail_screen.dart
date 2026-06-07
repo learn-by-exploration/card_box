@@ -18,6 +18,7 @@ import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/contact_action_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/vcard_export_service.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
@@ -48,6 +49,17 @@ class CardDetailScreen extends StatelessWidget {
           appBar: AppBar(
             title: Text(card.name),
             actions: [
+              IconButton(
+                tooltip: card.archived ? 'Restore card' : 'Archive card',
+                icon: Icon(
+                  card.archived
+                      ? Icons.unarchive_outlined
+                      : Icons.archive_outlined,
+                ),
+                onPressed: () => card.archived
+                    ? _restoreCard(card)
+                    : _archiveCard(context, card),
+              ),
               IconButton(
                 tooltip: card.favorite ? 'Remove favorite' : 'Favorite',
                 icon: Icon(card.favorite ? Icons.star : Icons.star_border),
@@ -96,26 +108,9 @@ class CardDetailScreen extends StatelessWidget {
               if (card.hasBarcode) const SizedBox(height: 12),
               _InfoPanel(card: card),
               const SizedBox(height: 8),
-              if (!card.archived)
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.archive),
-                  label: const Text('Archive card'),
-                  onPressed: () async {
-                    await repository.archive(card.id);
-                    if (context.mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                )
-              else
+              if (card.archived)
                 Column(
                   children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.unarchive_outlined),
-                      label: const Text('Restore card'),
-                      onPressed: () => repository.unarchive(card.id),
-                    ),
-                    const SizedBox(height: 8),
                     OutlinedButton.icon(
                       icon: const Icon(Icons.delete_outline),
                       label: const Text('Delete permanently'),
@@ -128,6 +123,17 @@ class CardDetailScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _archiveCard(BuildContext context, WalletCard card) async {
+    await repository.archive(card.id);
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _restoreCard(WalletCard card) async {
+    await repository.unarchive(card.id);
   }
 
   Future<void> _confirmDelete(BuildContext context, WalletCard card) async {
@@ -177,9 +183,10 @@ class _ActionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -187,9 +194,9 @@ class _ActionHeader extends StatelessWidget {
               'What you can do now',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: tokens.spaceMedium - 2),
             Text(_summaryText()),
-            const SizedBox(height: 14),
+            SizedBox(height: tokens.spaceMedium + 2),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -632,9 +639,10 @@ class _BarcodePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -642,14 +650,14 @@ class _BarcodePanel extends StatelessWidget {
               'Presentation',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: tokens.spaceMedium + 2),
             Container(
               height: 148,
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(tokens.spaceMedium),
               decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: const Color(0xFFE1E7E5)),
-                borderRadius: BorderRadius.circular(8),
+                color: tokens.presentationSurface,
+                border: Border.all(color: tokens.borderSoft),
+                borderRadius: BorderRadius.circular(tokens.radiusSmall),
               ),
               child: BarcodePreview(
                 data: card.barcodePayload,
@@ -657,16 +665,16 @@ class _BarcodePanel extends StatelessWidget {
                 height: 120,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
             Text(
               card.barcodeFormat.isEmpty
                   ? 'Barcode/QR payload'
                   : card.barcodeFormat,
             ),
             if (card.barcodeImagePath.trim().isNotEmpty) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: tokens.spaceMedium),
               InkWell(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(tokens.radiusSmall),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => CardImageViewerScreen(
@@ -686,7 +694,7 @@ class _BarcodePanel extends StatelessWidget {
               ),
             ],
             if (card.hasBarcodeDetails) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: tokens.spaceMedium),
               if (card.barcodeDisplayValue.trim().isNotEmpty)
                 _InfoRow(
                   label: 'Display value',

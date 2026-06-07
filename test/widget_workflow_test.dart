@@ -12,9 +12,12 @@ import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/app_lock_settings_screen.dart';
 import 'package:card_box/screens/app_root.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
+import 'package:card_box/screens/card_search_screen.dart';
 import 'package:card_box/screens/home_screen.dart';
+import 'package:card_box/screens/theme_settings_screen.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/media_recovery_service.dart';
+import 'package:card_box/theme.dart';
 
 import 'test_support.dart';
 
@@ -23,7 +26,9 @@ void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
   group('HomeScreen', () {
-    testWidgets('search and category filter work together', (tester) async {
+    testWidgets('search screen and category filter work together', (
+      tester,
+    ) async {
       await tester.binding.setSurfaceSize(const Size(1200, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       SharedPreferences.setMockInitialValues({});
@@ -70,6 +75,7 @@ void main() {
       final categoryService = await createReadyCategoryService(
         preferences: prefs,
       );
+      final themeService = await createReadyThemeService(preferences: prefs);
       final mediaRecoveryService = MediaRecoveryService(preferences: prefs);
 
       await tester.pumpWidget(
@@ -78,6 +84,7 @@ void main() {
             repository: repository,
             appLockService: appLockService,
             categoryService: categoryService,
+            themeService: themeService,
             mediaRecoveryService: mediaRecoveryService,
             onRecoveredMediaDiscarded: () async {},
             onRecoveredMediaUsed: () {},
@@ -88,12 +95,14 @@ void main() {
       await tester.tap(find.text('Contacts'));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byTooltip('Search cards'));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'basketball');
       await tester.pumpAndSettle();
       expect(find.text('Aiko Tanaka'), findsOneWidget);
       expect(find.text('Library card'), findsNothing);
 
-      await tester.enterText(find.byType(TextField), '');
+      await tester.tap(find.byIcon(Icons.arrow_back));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cards'));
       await tester.pumpAndSettle();
@@ -101,7 +110,7 @@ void main() {
       expect(find.text('Aiko Tanaka'), findsNothing);
       expect(find.text('Office badge'), findsOneWidget);
 
-      await tester.tap(find.byType(DropdownButtonFormField<String?>));
+      await tester.tap(find.text('All categories'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Library').last);
       await tester.pumpAndSettle();
@@ -135,6 +144,7 @@ void main() {
       final categoryService = await createReadyCategoryService(
         preferences: prefs,
       );
+      final themeService = await createReadyThemeService(preferences: prefs);
 
       await tester.pumpWidget(
         wrapForTest(
@@ -142,6 +152,7 @@ void main() {
             repository: repository,
             appLockService: appLockService,
             categoryService: categoryService,
+            themeService: themeService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
             onRecoveredMediaDiscarded: () async {},
             onRecoveredMediaUsed: () {},
@@ -170,6 +181,7 @@ void main() {
       final categoryService = await createReadyCategoryService(
         preferences: prefs,
       );
+      final themeService = await createReadyThemeService(preferences: prefs);
       var discarded = false;
 
       await tester.pumpWidget(
@@ -178,6 +190,7 @@ void main() {
             repository: repository,
             appLockService: appLockService,
             categoryService: categoryService,
+            themeService: themeService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
             recoveredMediaDraft: const RecoveredMediaDraft(
               draftCardId: 'draft-1',
@@ -211,6 +224,7 @@ void main() {
         preferences: prefs,
         customCategories: const ['Sports Club'],
       );
+      final themeService = await createReadyThemeService(preferences: prefs);
 
       await tester.pumpWidget(
         wrapForTest(
@@ -218,6 +232,7 @@ void main() {
             repository: repository,
             appLockService: appLockService,
             categoryService: categoryService,
+            themeService: themeService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
             onRecoveredMediaDiscarded: () async {},
             onRecoveredMediaUsed: () {},
@@ -225,11 +240,126 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byType(DropdownButtonFormField<String?>));
+      await tester.tap(find.text('All categories'));
       await tester.pumpAndSettle();
 
       expect(find.text('Sports Club'), findsOneWidget);
       expect(find.text('All categories'), findsWidgets);
+    });
+  });
+
+  group('CardSearchScreen', () {
+    testWidgets('shows recent items when query is empty', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'recent-1',
+          name: 'Newest card',
+          category: CardCategory.loyalty,
+          updatedAt: DateTime(2026, 6, 6, 12),
+          createdAt: DateTime(2026, 6, 6, 12),
+        ),
+      );
+      await repository.upsert(
+        WalletCard(
+          id: 'recent-2',
+          name: 'Older card',
+          category: CardCategory.library,
+          updatedAt: DateTime(2026, 6, 5, 12),
+          createdAt: DateTime(2026, 6, 5, 12),
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrapForTest(
+          CardSearchScreen(
+            repository: repository,
+            showContactsInitially: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('recent item'), findsOneWidget);
+      expect(find.text('Newest card'), findsOneWidget);
+      expect(find.text('Older card'), findsOneWidget);
+    });
+
+    testWidgets('remembers last selected mode', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'card-item',
+          name: 'Wallet card',
+          category: CardCategory.loyalty,
+          updatedAt: DateTime(2026, 6, 6, 12),
+          createdAt: DateTime(2026, 6, 6, 12),
+        ),
+      );
+      await repository.upsert(
+        WalletCard(
+          id: 'contact-item',
+          name: 'Aiko Tanaka',
+          category: CardCategory.contact,
+          cardType: CardType.visitingCard,
+          updatedAt: DateTime(2026, 6, 6, 13),
+          createdAt: DateTime(2026, 6, 6, 13),
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrapForTest(
+          CardSearchScreen(
+            repository: repository,
+            showContactsInitially: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Contacts'));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        wrapForTest(
+          CardSearchScreen(
+            repository: repository,
+            showContactsInitially: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Aiko Tanaka'), findsOneWidget);
+      expect(find.text('Wallet card'), findsNothing);
+    });
+  });
+
+  group('Theme settings', () {
+    testWidgets('theme mode can be updated from settings', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final themeService = await createReadyThemeService(
+        preferences: prefs,
+        initialMode: ThemeMode.system,
+      );
+
+      await tester.pumpWidget(
+        wrapForTest(ThemeSettingsScreen(themeService: themeService)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(themeService.themeMode, ThemeMode.system);
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+      expect(themeService.themeMode, ThemeMode.dark);
+      expect(prefs.getString('card_box.theme_mode.v1'), 'dark');
     });
   });
 
@@ -251,6 +381,7 @@ void main() {
       final categoryService = await createReadyCategoryService(
         preferences: prefs,
       );
+      final themeService = await createReadyThemeService(preferences: prefs);
 
       await tester.pumpWidget(
         wrapForTest(
@@ -258,6 +389,7 @@ void main() {
             repository: repository,
             appLockService: appLockService,
             categoryService: categoryService,
+            themeService: themeService,
             mediaRecoveryService: MediaRecoveryService(preferences: prefs),
           ),
         ),
@@ -277,10 +409,13 @@ void main() {
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
+      final expectedScrim = CardBoxThemeTokens.of(
+        tester.element(find.byType(AppRoot)),
+      ).appObscureScrim;
       expect(
         find.byWidgetPredicate(
           (widget) =>
-              widget is ColoredBox && widget.color == const Color(0xFF0F1713),
+              widget is ColoredBox && widget.color == expectedScrim,
         ),
         findsOneWidget,
       );
@@ -368,6 +503,48 @@ void main() {
       expect(find.text('Website'), findsOneWidget);
       expect(find.text('Export vCard'), findsOneWidget);
       expect(find.textContaining('NFC/RFID'), findsNothing);
+    });
+
+    testWidgets('card detail exposes archive action in the top bar', (
+      tester,
+    ) async {
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'archive-me',
+          name: 'Club badge',
+          category: CardCategory.access,
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
+      final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService();
+
+      await tester.pumpWidget(
+        wrapForTest(
+          Navigator(
+            onGenerateRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => CardDetailScreen(
+                repository: repository,
+                appLockService: appLockService,
+                categoryService: categoryService,
+                cardId: 'archive-me',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Archive card'), findsOneWidget);
+      expect(find.text('Archive card'), findsNothing);
+
+      await tester.tap(find.byTooltip('Archive card'));
+      await tester.pumpAndSettle();
+
+      expect(repository.findById('archive-me')!.archived, isTrue);
     });
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/wallet_card.dart';
+import 'package:card_box/theme.dart';
 
 enum CardTileLayout { list, grid }
 
@@ -11,11 +12,15 @@ class CardTile extends StatelessWidget {
     required this.card,
     required this.onTap,
     this.layout = CardTileLayout.list,
+    this.onShowCode,
+    this.onShowImages,
   });
 
   final WalletCard card;
   final VoidCallback onTap;
   final CardTileLayout layout;
+  final VoidCallback? onShowCode;
+  final VoidCallback? onShowImages;
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +32,13 @@ class CardTile extends StatelessWidget {
 
   Widget _buildListTile(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(tokens.radiusSmall),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(tokens.spaceMedium),
           child: Row(
             children: [
               Container(
@@ -40,11 +46,11 @@ class CardTile extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(tokens.radiusSmall),
                 ),
                 child: Icon(_iconForCard(), color: colors.onPrimaryContainer),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: tokens.spaceMedium),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,10 +65,18 @@ class CardTile extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
-                        if (card.favorite) const Icon(Icons.star, size: 18),
+                        if (card.favorite)
+                          Icon(Icons.star, size: tokens.iconSmall),
+                        if (card.favorite &&
+                            (onShowCode != null || onShowImages != null))
+                          SizedBox(width: tokens.spaceXSmall),
+                        _QuickActionRow(
+                          onShowCode: onShowCode,
+                          onShowImages: onShowImages,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: tokens.spaceXSmall),
                     Text(
                       card.issuer.isEmpty
                           ? card.categoryLabel
@@ -70,7 +84,7 @@ class CardTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: tokens.spaceSmall - 2),
                     Row(
                       children: [
                         Flexible(
@@ -78,12 +92,12 @@ class CardTile extends StatelessWidget {
                             alignment: Alignment.centerLeft,
                             child: _MiniBadge(
                               label: _statusLabel(),
-                              background: _statusBackground(colors),
-                              foreground: _statusForeground(colors),
+                              background: _statusTone(tokens).background,
+                              foreground: _statusTone(tokens).foreground,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: tokens.spaceSmall),
                         Text(
                           card.hasBarcode
                               ? 'Tap for code'
@@ -97,14 +111,6 @@ class CardTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                card.hasBarcode
-                    ? Icons.qr_code_scanner_outlined
-                    : card.isVisitingCard
-                    ? Icons.contact_phone_outlined
-                    : Icons.more_horiz,
-              ),
             ],
           ),
         ),
@@ -114,12 +120,13 @@ class CardTile extends StatelessWidget {
 
   Widget _buildGridTile(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(tokens.radiusSmall),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(tokens.spaceMedium),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -130,7 +137,7 @@ class CardTile extends StatelessWidget {
                     height: 42,
                     decoration: BoxDecoration(
                       color: colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(tokens.radiusSmall),
                     ),
                     child: Icon(
                       _iconForCard(),
@@ -138,17 +145,26 @@ class CardTile extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  if (card.favorite) const Icon(Icons.star, size: 18),
+                  _QuickActionRow(
+                    onShowCode: onShowCode,
+                    onShowImages: onShowImages,
+                    compact: true,
+                  ),
+                  if ((onShowCode != null || onShowImages != null) &&
+                      card.favorite)
+                    SizedBox(width: tokens.spaceXSmall),
+                  if (card.favorite)
+                    Icon(Icons.star, size: tokens.iconSmall),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: tokens.spaceMedium),
               Text(
                 card.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: tokens.spaceSmall - 2),
               Text(
                 card.issuer.isEmpty ? card.categoryLabel : card.issuer,
                 maxLines: 2,
@@ -156,19 +172,21 @@ class CardTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const Spacer(),
-              _MiniBadge(
-                label: _statusLabel(),
-                background: _statusBackground(colors),
-                foreground: _statusForeground(colors),
+              SizedBox(
+                width: double.infinity,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _MiniBadge(
+                    label: _statusLabel(),
+                    background: _statusTone(tokens).background,
+                    foreground: _statusTone(tokens).foreground,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: tokens.spaceSmall),
               Text(
-                card.hasBarcode
-                    ? 'Show code'
-                    : card.isVisitingCard
-                    ? 'Open contact'
-                    : 'Open card',
-                maxLines: 1,
+                _gridActionHint(),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -207,34 +225,21 @@ class CardTile extends StatelessWidget {
     };
   }
 
-  Color _statusBackground(ColorScheme colors) {
-    if (card.isVisitingCard) {
-      return const Color(0xFFE7F6F1);
+  String _gridActionHint() {
+    if (card.hasBarcode) {
+      return 'Code';
     }
-    return switch (card.compatibilityStatus) {
-      CompatibilityStatus.barcodeDisplayable => const Color(0xFFE8F5E9),
-      CompatibilityStatus.nfcReadable => const Color(0xFFE4F2FF),
-      CompatibilityStatus.referenceOnly => const Color(0xFFF3EEE8),
-      CompatibilityStatus.untested => const Color(0xFFFFF3E0),
-      CompatibilityStatus.nfcDetectedNotReadable => const Color(0xFFFFF4E5),
-      CompatibilityStatus.androidHceCandidate => const Color(0xFFECEAF7),
-      CompatibilityStatus.unsupported => const Color(0xFFFDECEC),
-    };
+    if (card.isVisitingCard) {
+      return 'Contact';
+    }
+    return 'Card';
   }
 
-  Color _statusForeground(ColorScheme colors) {
-    if (card.isVisitingCard) {
-      return const Color(0xFF0D5C4A);
-    }
-    return switch (card.compatibilityStatus) {
-      CompatibilityStatus.barcodeDisplayable => const Color(0xFF1B5E20),
-      CompatibilityStatus.nfcReadable => const Color(0xFF0D47A1),
-      CompatibilityStatus.referenceOnly => const Color(0xFF6D4C41),
-      CompatibilityStatus.untested => const Color(0xFF8A5200),
-      CompatibilityStatus.nfcDetectedNotReadable => const Color(0xFF8A5200),
-      CompatibilityStatus.androidHceCandidate => const Color(0xFF4A3C88),
-      CompatibilityStatus.unsupported => const Color(0xFF8E1B1B),
-    };
+  CardBoxStatusTone _statusTone(CardBoxThemeTokens tokens) {
+    return tokens.statusToneFor(
+      card.compatibilityStatus,
+      isVisitingCard: card.isVisitingCard,
+    );
   }
 }
 
@@ -257,17 +262,89 @@ class _MiniBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: EdgeInsets.symmetric(
+          horizontal: CardBoxThemeTokens.of(context).spaceSmall,
+          vertical: CardBoxThemeTokens.of(context).spaceXSmall,
+        ),
         child: Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
             color: foreground,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _QuickActionRow extends StatelessWidget {
+  const _QuickActionRow({
+    required this.onShowCode,
+    required this.onShowImages,
+    this.compact = false,
+  });
+
+  final VoidCallback? onShowCode;
+  final VoidCallback? onShowImages;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (onShowCode == null && onShowImages == null) {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onShowCode != null)
+          _QuickActionButton(
+            tooltip: 'Show code',
+            icon: Icons.qr_code_scanner_outlined,
+            onPressed: onShowCode!,
+            compact: compact,
+          ),
+        if (onShowImages != null)
+          _QuickActionButton(
+            tooltip: 'Show saved images',
+            icon: Icons.photo_library_outlined,
+            onPressed: onShowImages!,
+            compact: compact,
+          ),
+      ],
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  const _QuickActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    required this.compact,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    return SizedBox(
+      width: compact ? 28 : 32,
+      height: compact ? 28 : 32,
+      child: IconButton(
+        tooltip: tooltip,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        iconSize: compact ? tokens.iconSmall : tokens.iconMedium,
+        onPressed: onPressed,
+        icon: Icon(icon),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/services/vcard_export_service.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 
 class ContactQrScreen extends StatelessWidget {
@@ -12,11 +13,12 @@ class ContactQrScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final payload = const VCardExportService().buildQrPayload(card);
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(card.name)),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(tokens.spaceXLarge),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -25,21 +27,21 @@ class ContactQrScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: tokens.spaceSmall),
               Text(
                 card.issuer.isEmpty ? card.categoryLabel : card.issuer,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: tokens.spaceXLarge + 4),
               Expanded(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFD8DEDC)),
+                    color: tokens.presentationSurface,
+                    borderRadius: BorderRadius.circular(tokens.radiusSmall),
+                    border: Border.all(color: tokens.borderSoft),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(tokens.spaceXLarge),
                     child: Center(
                       child: BarcodePreview(
                         data: payload,
@@ -50,7 +52,7 @@ class ContactQrScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: tokens.spaceLarge),
               Text(
                 'This QR contains a compact contact card so another phone can save the details quickly.',
                 textAlign: TextAlign.center,

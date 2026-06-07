@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:card_box/theme.dart';
 
 Widget buildStoredCardImage(
   BuildContext context, {
@@ -7,13 +8,14 @@ Widget buildStoredCardImage(
   double? height,
   BoxFit fit = BoxFit.cover,
 }) {
+  final tokens = CardBoxThemeTokens.of(context);
   return Container(
     height: height,
     alignment: Alignment.center,
     decoration: BoxDecoration(
-      border: Border.all(color: const Color(0xFFD8DEDC)),
-      borderRadius: BorderRadius.circular(8),
-      color: Colors.white,
+      border: Border.all(color: tokens.borderSoft),
+      borderRadius: BorderRadius.circular(tokens.radiusSmall),
+      color: tokens.surfaceRaised,
     ),
     child: Text(
       path.trim().isEmpty ? emptyLabel : path,
