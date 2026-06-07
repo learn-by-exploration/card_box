@@ -5,6 +5,7 @@ import 'package:card_box/screens/card_detail_screen.dart';
 import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/card_repository.dart';
 import 'package:card_box/services/category_service.dart';
+import 'package:card_box/theme.dart';
 
 class ArchivedCardsScreen extends StatelessWidget {
   const ArchivedCardsScreen({
@@ -20,6 +21,7 @@ class ArchivedCardsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return AnimatedBuilder(
       animation: repository,
       builder: (context, _) {
@@ -37,7 +39,12 @@ class ArchivedCardsScreen extends StatelessWidget {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  padding: EdgeInsets.fromLTRB(
+                    tokens.spaceLarge,
+                    tokens.spaceMedium,
+                    tokens.spaceLarge,
+                    tokens.spaceXLarge + 12,
+                  ),
                   itemBuilder: (context, index) {
                     final card = cards[index];
                     return _ArchivedCardRow(
@@ -56,7 +63,8 @@ class ArchivedCardsScreen extends StatelessWidget {
                       onDelete: () => _confirmDelete(context, card),
                     );
                   },
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) =>
+                      SizedBox(height: tokens.spaceMedium - 2),
                   itemCount: cards.length,
                 ),
         );
@@ -105,56 +113,61 @@ class _ArchivedCardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(tokens.spaceMedium),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkWell(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(tokens.radiusSmall),
               onTap: onOpen,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: EdgeInsets.symmetric(vertical: tokens.spaceXSmall),
                 child: Row(
                   children: [
-                    const Icon(Icons.archive_outlined),
-                    const SizedBox(width: 12),
+                    Icon(Icons.archive_outlined, size: tokens.iconMedium),
+                    SizedBox(width: tokens.spaceMedium),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             card.name,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: tokens.spaceXSmall),
                           Text(
                             card.issuer.isEmpty
                                 ? card.categoryLabel
                                 : '${card.issuer} • ${card.categoryLabel}',
+                            style: theme.textTheme.bodyMedium,
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right),
+                    Icon(Icons.chevron_right, size: tokens.iconMedium),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.spaceMedium),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: tokens.spaceSmall,
+              runSpacing: tokens.spaceSmall,
               children: [
                 OutlinedButton.icon(
                   onPressed: onRestore,
-                  icon: const Icon(Icons.unarchive_outlined),
+                  icon: Icon(Icons.unarchive_outlined, size: tokens.iconMedium),
                   label: const Text('Restore'),
                 ),
                 OutlinedButton.icon(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline),
+                  icon: Icon(Icons.delete_outline, size: tokens.iconMedium),
                   label: const Text('Delete'),
                 ),
               ],

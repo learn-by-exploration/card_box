@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:card_box/models/scanned_code.dart';
 import 'package:card_box/services/device_settings_service.dart';
+import 'package:card_box/theme.dart';
 
 enum _ScanMode {
   barcode('Barcode'),
@@ -91,6 +92,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scan barcode or QR'),
@@ -118,7 +121,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(tokens.spaceLarge),
           child: !_scannerEnabled
               ? _ConsentPanel(
                   selectedMode: _scanMode,
@@ -134,7 +137,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
                     return Stack(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            tokens.radiusSmall,
+                          ),
                           child: MobileScanner(
                             key: ValueKey(
                               'scanner-${_scanMode.name}-$_scannerGeneration',
@@ -175,37 +180,37 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
                           left: 24,
                           right: 24,
                           top: 24,
-                          child: Column(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.68),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: Text(
-                                    'Card Box waits for a stable read, then asks you to confirm it before saving.',
-                                    style: TextStyle(color: Colors.white),
-                                    textAlign: TextAlign.center,
+                              Flexible(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.68),
+                                    borderRadius: BorderRadius.circular(
+                                      tokens.radiusSmall,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(tokens.spaceXSmall),
+                                    child: _ModeChipBar(
+                                      selectedMode: _scanMode,
+                                      onModeChanged: _switchingMode
+                                          ? null
+                                          : _changeMode,
+                                      compact: true,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              _ModeChipBar(
-                                selectedMode: _scanMode,
-                                onModeChanged: _switchingMode
-                                    ? null
-                                    : _changeMode,
                               ),
                             ],
                           ),
                         ),
                         if (_candidatePayload != null)
                           Positioned(
-                            left: 16,
-                            right: 16,
-                            bottom: 16,
+                            left: tokens.spaceLarge,
+                            right: tokens.spaceLarge,
+                            bottom: tokens.spaceLarge,
                             child: _CandidatePanel(
                               payload: _candidatePayload!,
                               format: _candidateFormat ?? 'Unknown format',
@@ -215,18 +220,19 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
                           )
                         else
                           Positioned(
-                            left: 16,
-                            right: 16,
-                            bottom: 16,
+                            left: tokens.spaceLarge,
+                            right: tokens.spaceLarge,
+                            bottom: tokens.spaceLarge,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(
+                                  tokens.radiusSmall,
+                                ),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.all(14),
+                                padding: EdgeInsets.all(tokens.spaceMedium),
                                 child: Text(
                                   _scannerErrorMessage != null
                                       ? _scannerErrorMessage!
@@ -752,33 +758,38 @@ class _ConsentPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = CardBoxThemeTokens.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Card(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(tokens.spaceXLarge),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Camera permission',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Card Box uses the camera only after you choose to scan a visible barcode or QR code.',
+                SizedBox(height: tokens.spaceMedium - 2),
+                Text(
+                  'Choose the kind of code you want to scan, then start the camera when you are ready.',
+                  style: theme.textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: tokens.spaceLarge),
                 _ModeChipBar(
                   selectedMode: selectedMode,
                   onModeChanged: onModeChanged,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: tokens.spaceLarge),
                 FilledButton.icon(
                   onPressed: onStart,
-                  icon: const Icon(Icons.qr_code_scanner),
+                  icon: Icon(Icons.qr_code_scanner, size: tokens.iconMedium),
                   label: const Text('Start scanner'),
                 ),
               ],
@@ -791,20 +802,27 @@ class _ConsentPanel extends StatelessWidget {
 }
 
 class _ModeChipBar extends StatelessWidget {
-  const _ModeChipBar({required this.selectedMode, required this.onModeChanged});
+  const _ModeChipBar({
+    required this.selectedMode,
+    required this.onModeChanged,
+    this.compact = false,
+  });
 
   final _ScanMode selectedMode;
   final ValueChanged<_ScanMode>? onModeChanged;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: compact ? tokens.spaceXSmall : tokens.spaceSmall,
+      runSpacing: compact ? tokens.spaceXSmall : tokens.spaceSmall,
       children: [
         for (final mode in _ScanMode.values)
           ChoiceChip(
             label: Text(mode.label),
+            visualDensity: compact ? VisualDensity.compact : null,
             selected: mode == selectedMode,
             onSelected: onModeChanged == null
                 ? null
@@ -834,21 +852,40 @@ class _CandidatePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = CardBoxThemeTokens.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Stable read found',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.spaceSmall),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: tokens.spaceSmall,
+                    vertical: tokens.spaceXSmall,
+                  ),
+                  child: Text(format, style: theme.textTheme.labelMedium),
+                ),
+              ),
+            ),
+            SizedBox(height: tokens.spaceSmall),
             Text(payload, maxLines: 2, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text(format, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.spaceMedium),
             Row(
               children: [
                 Expanded(
@@ -857,7 +894,7 @@ class _CandidatePanel extends StatelessWidget {
                     child: const Text('Keep scanning'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: tokens.spaceMedium),
                 Expanded(
                   child: FilledButton(
                     onPressed: onUse,
@@ -940,6 +977,8 @@ class _ScannerErrorPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = CardBoxThemeTokens.of(context);
     return ColoredBox(
       color: Colors.black,
       child: Center(
@@ -947,17 +986,24 @@ class _ScannerErrorPanel extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 360),
           child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(tokens.spaceXLarge),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.qr_code_scanner_outlined, size: 36),
-                  const SizedBox(height: 12),
-                  Text(message, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
+                  Icon(
+                    Icons.qr_code_scanner_outlined,
+                    size: tokens.iconLarge + 12,
+                  ),
+                  SizedBox(height: tokens.spaceMedium),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: tokens.spaceLarge),
                   Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                    spacing: tokens.spaceMedium,
+                    runSpacing: tokens.spaceMedium,
                     alignment: WrapAlignment.center,
                     children: [
                       FilledButton(

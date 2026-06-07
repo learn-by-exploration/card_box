@@ -184,126 +184,40 @@ class _ActionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
+    final primaryActions = _primaryActions(context);
+    final secondaryActions = _secondaryActions(context);
     return Card(
       child: Padding(
         padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'What you can do now',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             SizedBox(height: tokens.spaceMedium - 2),
-            Text(_summaryText()),
+            Text(_summaryText(), style: theme.textTheme.bodyMedium),
             SizedBox(height: tokens.spaceMedium + 2),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (card.isVisitingCard)
+                for (final action in primaryActions)
                   FilledButton.icon(
-                    icon: const Icon(Icons.qr_code_2_outlined),
-                    label: const Text('Show contact QR'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ContactQrScreen(card: card),
-                      ),
-                    ),
+                    icon: Icon(action.icon),
+                    label: Text(action.label),
+                    onPressed: action.onPressed,
                   ),
-                if (card.isVisitingCard)
-                  FilledButton.icon(
-                    icon: const Icon(Icons.copy_all_outlined),
-                    label: const Text('Copy contact'),
-                    onPressed: () => _copyContactBlock(context),
-                  ),
-                FilledButton.icon(
-                  icon: const Icon(Icons.share_outlined),
-                  label: Text(
-                    card.isVisitingCard ? 'Share contact' : 'Share card',
-                  ),
-                  onPressed: () => _shareCard(context),
-                ),
-                if (card.isVisitingCard && card.contactPhones.isNotEmpty)
+                if (secondaryActions.isNotEmpty)
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.call_outlined),
-                    label: const Text('Call'),
-                    onPressed: () => _launchContactValue(
-                      context,
-                      title: 'Choose phone number',
-                      values: card.contactPhones,
-                      uriBuilder: _contactActionService.phoneUri,
-                      unsupportedMessage: 'This phone number cannot be opened.',
-                    ),
-                  ),
-                if (card.isVisitingCard && card.contactEmails.isNotEmpty)
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.email_outlined),
-                    label: const Text('Email'),
-                    onPressed: () => _launchContactValue(
-                      context,
-                      title: 'Choose email address',
-                      values: card.contactEmails,
-                      uriBuilder: _contactActionService.emailUri,
-                      unsupportedMessage:
-                          'This email address cannot be opened.',
-                    ),
-                  ),
-                if (card.isVisitingCard && card.contactWebsites.isNotEmpty)
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.language_outlined),
-                    label: const Text('Website'),
-                    onPressed: () => _launchContactValue(
-                      context,
-                      title: 'Choose website',
-                      values: card.contactWebsites,
-                      uriBuilder: _contactActionService.websiteUri,
-                      unsupportedMessage: 'This website cannot be opened.',
-                    ),
-                  ),
-                if (card.isVisitingCard)
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.perm_contact_calendar_outlined),
-                    label: const Text('Export vCard'),
-                    onPressed: () => _exportVCard(context),
-                  ),
-                if (card.hasBarcode)
-                  FilledButton.icon(
-                    icon: const Icon(Icons.fullscreen),
-                    label: const Text('Present code'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => BarcodePresentScreen(card: card),
-                      ),
-                    ),
-                  ),
-                if (!card.hasBarcode && card.hasPhotos)
-                  FilledButton.icon(
-                    icon: const Icon(Icons.credit_card),
-                    label: const Text('Show card'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CardReferencePresentScreen(card: card),
-                      ),
-                    ),
-                  ),
-                if (!card.isVisitingCard)
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.sensors),
-                    label: Text(
-                      card.compatibilityStatus == CompatibilityStatus.untested
-                          ? 'Test NFC/RFID'
-                          : 'Retest NFC/RFID',
-                    ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CompatibilityTestScreen(
-                          repository: repository,
-                          appLockService: appLockService,
-                          card: card,
-                        ),
-                      ),
-                    ),
+                    icon: const Icon(Icons.more_horiz),
+                    label: const Text('More actions'),
+                    onPressed: () =>
+                        _showMoreActions(context, secondaryActions),
                   ),
               ],
             ),
@@ -311,6 +225,121 @@ class _ActionHeader extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<_DetailActionItem> _primaryActions(BuildContext context) {
+    if (card.isVisitingCard) {
+      return [
+        _DetailActionItem(
+          icon: Icons.qr_code_2_outlined,
+          label: 'Show contact QR',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ContactQrScreen(card: card)),
+          ),
+        ),
+        _DetailActionItem(
+          icon: Icons.share_outlined,
+          label: 'Share contact',
+          onPressed: () => _shareCard(context),
+        ),
+      ];
+    }
+
+    final actions = <_DetailActionItem>[
+      if (card.hasBarcode)
+        _DetailActionItem(
+          icon: Icons.fullscreen,
+          label: 'Present code',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card)),
+          ),
+        ),
+      if (!card.hasBarcode && card.hasPhotos)
+        _DetailActionItem(
+          icon: Icons.credit_card,
+          label: 'Show card',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CardReferencePresentScreen(card: card),
+            ),
+          ),
+        ),
+      _DetailActionItem(
+        icon: Icons.share_outlined,
+        label: 'Share card',
+        onPressed: () => _shareCard(context),
+      ),
+    ];
+    return actions.take(2).toList();
+  }
+
+  List<_DetailActionItem> _secondaryActions(BuildContext context) {
+    return [
+      if (card.isVisitingCard)
+        _DetailActionItem(
+          icon: Icons.copy_all_outlined,
+          label: 'Copy contact',
+          onPressed: () => _copyContactBlock(context),
+        ),
+      if (card.isVisitingCard && card.contactPhones.isNotEmpty)
+        _DetailActionItem(
+          icon: Icons.call_outlined,
+          label: 'Call',
+          onPressed: () => _launchContactValue(
+            context,
+            title: 'Choose phone number',
+            values: card.contactPhones,
+            uriBuilder: _contactActionService.phoneUri,
+            unsupportedMessage: 'This phone number cannot be opened.',
+          ),
+        ),
+      if (card.isVisitingCard && card.contactEmails.isNotEmpty)
+        _DetailActionItem(
+          icon: Icons.email_outlined,
+          label: 'Email',
+          onPressed: () => _launchContactValue(
+            context,
+            title: 'Choose email address',
+            values: card.contactEmails,
+            uriBuilder: _contactActionService.emailUri,
+            unsupportedMessage: 'This email address cannot be opened.',
+          ),
+        ),
+      if (card.isVisitingCard && card.contactWebsites.isNotEmpty)
+        _DetailActionItem(
+          icon: Icons.language_outlined,
+          label: 'Website',
+          onPressed: () => _launchContactValue(
+            context,
+            title: 'Choose website',
+            values: card.contactWebsites,
+            uriBuilder: _contactActionService.websiteUri,
+            unsupportedMessage: 'This website cannot be opened.',
+          ),
+        ),
+      if (card.isVisitingCard)
+        _DetailActionItem(
+          icon: Icons.perm_contact_calendar_outlined,
+          label: 'Export vCard',
+          onPressed: () => _exportVCard(context),
+        ),
+      if (!card.isVisitingCard)
+        _DetailActionItem(
+          icon: Icons.sensors,
+          label: card.compatibilityStatus == CompatibilityStatus.untested
+              ? 'Test NFC/RFID'
+              : 'Retest NFC/RFID',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CompatibilityTestScreen(
+                repository: repository,
+                appLockService: appLockService,
+                card: card,
+              ),
+            ),
+          ),
+        ),
+    ];
   }
 
   String _summaryText() {
@@ -477,6 +506,60 @@ class _ActionHeader extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _showMoreActions(
+    BuildContext context,
+    List<_DetailActionItem> actions,
+  ) async {
+    final tokens = CardBoxThemeTokens.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            tokens.spaceLarge,
+            tokens.spaceXSmall,
+            tokens.spaceLarge,
+            tokens.spaceLarge,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'More actions',
+                style: Theme.of(sheetContext).textTheme.titleMedium,
+              ),
+              SizedBox(height: tokens.spaceSmall),
+              for (final action in actions)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(action.icon),
+                  title: Text(action.label),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    action.onPressed();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailActionItem {
+  const _DetailActionItem({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
 }
 
 class _PhotoStrip extends StatelessWidget {
@@ -486,6 +569,7 @@ class _PhotoStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     return Row(
       children: [
         Expanded(
@@ -495,7 +579,7 @@ class _PhotoStrip extends StatelessWidget {
             value: card.frontImagePath,
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: tokens.spaceMedium - 2),
         Expanded(
           child: _PhotoPlaceholder(
             cardName: card.name,
@@ -521,9 +605,10 @@ class _PhotoPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
     final canOpen = value.trim().isNotEmpty;
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(tokens.radiusSmall),
       onTap: canOpen
           ? () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -550,13 +635,20 @@ class _PhotoPlaceholder extends StatelessWidget {
                     color: Colors.black.withValues(alpha: 0.62),
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: tokens.spaceSmall,
+                      vertical: tokens.spaceXSmall,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.open_in_full, size: 14, color: Colors.white),
-                        SizedBox(width: 4),
+                        Icon(
+                          Icons.open_in_full,
+                          size: tokens.iconSmall - 2,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: tokens.spaceXSmall),
                         Text(
                           'Open',
                           style: TextStyle(
@@ -584,29 +676,33 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     final status = card.compatibilityStatus;
-    final colors = Theme.of(context).colorScheme;
+    final colors = theme.colorScheme;
     final label = card.isVisitingCard ? 'Contact saved' : status.label;
     final description = card.isVisitingCard
         ? 'This visiting card is saved with its images and extracted contact details.'
         : status.description;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(tokens.spaceMedium),
         child: Row(
           children: [
-            Icon(_icon(status), color: colors.primary),
-            const SizedBox(width: 12),
+            Icon(_icon(status), color: colors.primary, size: tokens.iconLarge),
+            SizedBox(width: tokens.spaceMedium),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(description),
+                  SizedBox(height: tokens.spaceXSmall - 1),
+                  Text(description, style: theme.textTheme.bodyMedium),
                 ],
               ),
             ),
@@ -748,12 +844,21 @@ class _InfoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(tokens.spaceLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Saved details',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: tokens.spaceMedium),
             _InfoRow(label: 'Interfaces', value: _interfaceSummary(card)),
             _InfoRow(label: 'Category', value: card.categoryLabel),
             _buildInfoRow(
@@ -874,17 +979,21 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: tokens.spaceMedium - 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 2),
-          Text(value),
+          SizedBox(height: tokens.spaceXSmall / 2),
+          Text(value, style: theme.textTheme.bodyMedium),
         ],
       ),
     );
@@ -904,8 +1013,10 @@ class _CopyableInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: tokens.spaceMedium - 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -914,8 +1025,7 @@ class _CopyableInfoRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: theme.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -924,12 +1034,12 @@ class _CopyableInfoRow extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Copy $label',
                 onPressed: onCopy,
-                icon: const Icon(Icons.copy_rounded, size: 18),
+                icon: Icon(Icons.copy_rounded, size: tokens.iconSmall),
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          Text(value),
+          SizedBox(height: tokens.spaceXSmall / 2),
+          Text(value, style: theme.textTheme.bodyMedium),
         ],
       ),
     );

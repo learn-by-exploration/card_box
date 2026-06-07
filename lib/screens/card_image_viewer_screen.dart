@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:card_box/theme.dart';
 
 class CardImageViewerScreen extends StatefulWidget {
   const CardImageViewerScreen({
@@ -23,6 +24,8 @@ class _CardImageViewerScreenState extends State<CardImageViewerScreen> {
   Widget build(BuildContext context) {
     final file = File(widget.imagePath);
     final canReset = _quarterTurns != 0;
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -58,11 +61,13 @@ class _CardImageViewerScreenState extends State<CardImageViewerScreen> {
                     child: Image.file(
                       file,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Padding(
-                        padding: EdgeInsets.all(24),
+                      errorBuilder: (_, _, _) => Padding(
+                        padding: EdgeInsets.all(tokens.spaceXLarge + 4),
                         child: Text(
                           'This image could not be loaded.',
-                          style: TextStyle(color: Colors.white),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: Colors.white,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -71,11 +76,18 @@ class _CardImageViewerScreenState extends State<CardImageViewerScreen> {
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                tokens.spaceLarge,
+                0,
+                tokens.spaceLarge,
+                tokens.spaceLarge,
+              ),
               child: Text(
                 'Pinch to zoom. Use the rotate buttons if the card was captured sideways.',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white70,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),

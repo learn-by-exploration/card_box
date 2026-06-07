@@ -414,8 +414,7 @@ void main() {
       ).appObscureScrim;
       expect(
         find.byWidgetPredicate(
-          (widget) =>
-              widget is ColoredBox && widget.color == expectedScrim,
+          (widget) => widget is ColoredBox && widget.color == expectedScrim,
         ),
         findsOneWidget,
       );
@@ -497,13 +496,62 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Show contact QR'), findsOneWidget);
+      expect(find.text('Share contact'), findsOneWidget);
+      expect(find.text('More actions'), findsOneWidget);
+      expect(find.textContaining('NFC/RFID'), findsNothing);
+
+      await tester.tap(find.text('More actions'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Copy contact'), findsOneWidget);
       expect(find.text('Call'), findsOneWidget);
       expect(find.text('Email'), findsOneWidget);
       expect(find.text('Website'), findsOneWidget);
       expect(find.text('Export vCard'), findsOneWidget);
-      expect(find.textContaining('NFC/RFID'), findsNothing);
     });
+
+    testWidgets(
+      'mixed-interface visiting cards keep share contact in primary actions',
+      (tester) async {
+        final repository = CardRepository(database: createInMemoryDatabase());
+        await repository.init();
+        await repository.upsert(
+          WalletCard(
+            id: 'visit-code-card',
+            name: 'Aiko Tanaka',
+            issuer: 'CourtSide Japan',
+            category: CardCategory.contact,
+            cardType: CardType.visitingCard,
+            barcodePayload: 'https://courtside.jp/aiko',
+            barcodeFormat: 'qrCode',
+            contactPhones: const ['+81 90 1111 2222'],
+            contactEmails: const ['aiko@example.com'],
+            createdAt: DateTime(2026, 6, 4),
+            updatedAt: DateTime(2026, 6, 4),
+          ),
+        );
+        final appLockService = await createReadyAppLockService();
+        final categoryService = await createReadyCategoryService();
+
+        await tester.pumpWidget(
+          wrapForTest(
+            CardDetailScreen(
+              repository: repository,
+              appLockService: appLockService,
+              categoryService: categoryService,
+              cardId: 'visit-code-card',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Show contact QR'), findsOneWidget);
+        expect(find.text('Share contact'), findsOneWidget);
+        expect(find.text('Present code'), findsNothing);
+        expect(find.text('More actions'), findsOneWidget);
+      },
+    );
 
     testWidgets('card detail exposes archive action in the top bar', (
       tester,

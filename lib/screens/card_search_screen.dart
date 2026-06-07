@@ -5,6 +5,7 @@ import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/barcode_present_screen.dart';
 import 'package:card_box/screens/card_reference_present_screen.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/card_tile.dart';
 
 class CardSearchScreen extends StatefulWidget {
@@ -52,6 +53,8 @@ class _CardSearchScreenState extends State<CardSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: widget.repository,
       builder: (context, _) {
@@ -89,7 +92,12 @@ class _CardSearchScreenState extends State<CardSearchScreen> {
           ),
           body: SafeArea(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: EdgeInsets.fromLTRB(
+                tokens.spaceLarge,
+                tokens.spaceSmall,
+                tokens.spaceLarge,
+                tokens.spaceXLarge + tokens.spaceXSmall,
+              ),
               children: [
                 SegmentedButton<_SearchMode>(
                   showSelectedIcon: false,
@@ -112,7 +120,7 @@ class _CardSearchScreenState extends State<CardSearchScreen> {
                     _saveMode(nextMode);
                   },
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: tokens.spaceMedium),
                 Row(
                   children: [
                     Expanded(
@@ -122,23 +130,24 @@ class _CardSearchScreenState extends State<CardSearchScreen> {
                             : showingRecent
                             ? '${results.length} recent item${results.length == 1 ? '' : 's'}'
                             : '${results.length} result${results.length == 1 ? '' : 's'}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: tokens.spaceSmall),
                 if (results.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 32,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: tokens.spaceSmall,
+                      vertical: tokens.spaceXLarge + 12,
                     ),
                     child: Text(
                       showingRecent
                           ? 'Recent cards and contacts appear here when search is empty.'
                           : 'Try a different name, company, code, or note.',
                       textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium,
                     ),
                   )
                 else
@@ -153,7 +162,8 @@ class _CardSearchScreenState extends State<CardSearchScreen> {
                           : null,
                       onTap: () => Navigator.of(context).pop(results[index]),
                     ),
-                    if (index != results.length - 1) const SizedBox(height: 10),
+                    if (index != results.length - 1)
+                      SizedBox(height: tokens.spaceMedium - 2),
                   ],
               ],
             ),

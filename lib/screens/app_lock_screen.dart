@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:card_box/services/app_lock_service.dart';
+import 'package:card_box/theme.dart';
 
 class AppLockScreen extends StatefulWidget {
   const AppLockScreen({super.key, required this.appLockService});
@@ -38,13 +39,15 @@ class _AppLockScreenState extends State<AppLockScreen> {
   @override
   Widget build(BuildContext context) {
     final appLock = widget.appLockService;
+    final theme = Theme.of(context);
+    final tokens = CardBoxThemeTokens.of(context);
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(tokens.spaceXLarge + tokens.spaceXSmall),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -54,27 +57,30 @@ class _AppLockScreenState extends State<AppLockScreen> {
                     height: 72,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(16),
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(tokens.radiusLarge),
                     ),
                     child: Icon(
                       Icons.lock,
                       size: 36,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
+                  SizedBox(height: tokens.spaceXLarge),
+                  Text(
                     'Unlock Card Box',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
+                  SizedBox(height: tokens.spaceSmall),
+                  Text(
                     'Use your app PIN. If biometrics are enabled, you can unlock with your device sensor too.',
                     textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: tokens.spaceXLarge + tokens.spaceXSmall),
                   Form(
                     key: _formKey,
                     child: TextFormField(
@@ -92,19 +98,19 @@ class _AppLockScreenState extends State<AppLockScreen> {
                       onFieldSubmitted: (_) => _submitPin(),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: tokens.spaceMedium),
                   FilledButton(
                     onPressed: _submitting ? null : _submitPin,
                     child: Text(_submitting ? 'Unlocking...' : 'Unlock'),
                   ),
                   if (appLock.biometricEnabled &&
                       appLock.biometricAvailable) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: tokens.spaceSmall),
                     OutlinedButton.icon(
                       onPressed: appLock.authenticating
                           ? null
                           : () => _tryBiometrics(auto: false),
-                      icon: const Icon(Icons.fingerprint),
+                      icon: Icon(Icons.fingerprint, size: tokens.iconMedium),
                       label: Text(
                         appLock.authenticating
                             ? 'Waiting for biometrics...'
@@ -113,12 +119,12 @@ class _AppLockScreenState extends State<AppLockScreen> {
                     ),
                   ],
                   if (_message.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: tokens.spaceMedium),
                     Text(
                       _message,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                        color: theme.colorScheme.error,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
