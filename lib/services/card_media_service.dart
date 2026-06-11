@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:card_box/services/card_media_exception.dart';
 import 'package:card_box/services/card_media_store.dart' as media_store;
+import 'package:card_box/services/card_photo_tightener.dart';
 import 'package:card_box/services/ios_document_scanner.dart';
 
 abstract class CardMediaStoreDelegate {
@@ -184,13 +185,15 @@ class CardMediaService {
     CardPhotoEditor? photoEditor,
     AndroidDocumentScanner? androidDocumentScanner,
     CardMediaPlatform? platform,
+    CardPhotoTightener? photoTightener,
   }) : _imagePicker = imagePicker ?? ImagePicker(),
        _iosDocumentScanner = iosDocumentScanner ?? IosDocumentScanner(),
        _mediaStore = mediaStore ?? const DefaultCardMediaStoreDelegate(),
        _photoEditor = photoEditor ?? const DefaultCardPhotoEditor(),
        _androidDocumentScanner =
            androidDocumentScanner ?? const DefaultAndroidDocumentScanner(),
-       _platform = platform ?? _detectPlatform();
+       _platform = platform ?? _detectPlatform(),
+       _photoTightener = photoTightener ?? const DefaultCardPhotoTightener();
 
   final ImagePicker _imagePicker;
   final IosDocumentScanner _iosDocumentScanner;
@@ -198,6 +201,7 @@ class CardMediaService {
   final CardPhotoEditor _photoEditor;
   final AndroidDocumentScanner _androidDocumentScanner;
   final CardMediaPlatform _platform;
+  final CardPhotoTightener _photoTightener;
 
   static CardMediaPlatform _detectPlatform() {
     if (Platform.isAndroid) {
@@ -285,10 +289,14 @@ class CardMediaService {
       return null;
     }
     try {
-      final bytes = await File(capture.file.path).readAsBytes();
+      final rawBytes = await File(capture.file.path).readAsBytes();
+      // Tighten the crop into a card-shaped region using on-device text
+      // detection. This is fail-safe (returns the original bytes on
+      // failure) so we never regress the existing behavior.
+      final tightened = await _photoTightener.tighten(rawBytes);
       return await _mediaStore
           .storeImageBytes(
-            bytes,
+            tightened,
             sourcePath: capture.file.path,
             cardId: cardId,
             side: side,

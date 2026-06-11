@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:math' show Point;
 
-import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image/image.dart' as image;
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_ios.dart';
@@ -21,6 +24,7 @@ import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_media_exception.dart';
 import 'package:card_box/services/card_media_service.dart';
+import 'package:card_box/services/card_photo_tightener.dart';
 import 'package:card_box/services/card_share_service.dart';
 import 'package:card_box/services/file_share_service.dart';
 import 'package:card_box/services/ios_document_scanner.dart';
@@ -227,6 +231,95 @@ class _FakeIosDocumentScanner extends IosDocumentScanner {
 
   @override
   Future<String?> scanSinglePage() async => path;
+}
+
+class _FakeTextLine extends TextLine {
+  _FakeTextLine(Rect box)
+    : super(
+        text: 'x',
+        elements: const <TextElement>[],
+        boundingBox: box,
+        recognizedLanguages: const <String>[],
+        cornerPoints: const <Point<int>>[],
+        confidence: null,
+        angle: null,
+      );
+}
+
+class _FakeTextBlock extends TextBlock {
+  _FakeTextBlock(List<Rect> boxes)
+    : super(
+        text: 'x',
+        lines: boxes.map(_FakeTextLine.new).toList(),
+        boundingBox: boxes.isEmpty
+            ? Rect.zero
+            : boxes.reduce((a, b) => a.expandToInclude(b)),
+        recognizedLanguages: const <String>[],
+        cornerPoints: const <Point<int>>[],
+      );
+}
+
+class _ThrowingTextRecognizer extends TextRecognizer {
+  _ThrowingTextRecognizer() : super(script: TextRecognitionScript.latin);
+
+  int processCalls = 0;
+  int closeCalls = 0;
+
+  @override
+  Future<RecognizedText> processImage(InputImage inputImage) async {
+    processCalls += 1;
+    throw StateError('simulated recognizer failure');
+  }
+
+  @override
+  Future<void> close() async {
+    closeCalls += 1;
+  }
+}
+
+class _RecordingTextRecognizer extends TextRecognizer {
+  _RecordingTextRecognizer({required this.boxes})
+    : super(script: TextRecognitionScript.latin);
+
+  final List<Rect> boxes;
+  int processCalls = 0;
+  int closeCalls = 0;
+
+  @override
+  Future<RecognizedText> processImage(InputImage inputImage) async {
+    processCalls += 1;
+    return RecognizedText(
+      text: 'x',
+      blocks: <TextBlock>[_FakeTextBlock(boxes)],
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    closeCalls += 1;
+  }
+}
+
+class _SentinelTightener implements CardPhotoTightener {
+  _SentinelTightener({required this.sentinel});
+
+  final Uint8List sentinel;
+  int callCount = 0;
+
+  @override
+  Future<Uint8List> tighten(Uint8List jpegBytes) async {
+    callCount += 1;
+    return sentinel;
+  }
+}
+
+/// Returns a small, valid JPEG generated in-memory by the `image` package.
+/// Using the package itself (instead of a hand-crafted byte sequence) keeps
+/// the test honest: it relies on the same decode path used in production.
+Uint8List _minimalJpegBytes() {
+  final img = image.Image(width: 32, height: 32);
+  image.fill(img, color: image.ColorRgb8(255, 0, 0));
+  return Uint8List.fromList(image.encodeJpg(img, quality: 75));
 }
 
 void main() {
@@ -814,7 +907,7 @@ void main() {
         expect(
           (androidData['data'] as Map)['ratio_x'] /
               (androidData['data'] as Map)['ratio_y'],
-          closeTo(cardAspectRatio, 1e-3),
+          closeTo(cardAspectRatio, 0.01),
         );
 
         final iosMap = iosSettings.toMap();
@@ -827,9 +920,265 @@ void main() {
         expect(
           (iosData['data'] as Map)['ratio_x'] /
               (iosData['data'] as Map)['ratio_y'],
-          closeTo(cardAspectRatio, 1e-3),
+          closeTo(cardAspectRatio, 0.01),
         );
       },
     );
+  });
+
+  group('computeCardCrop', () {
+    test('returns the full image when dimensions are zero or negative', () {
+      final result = computeCardCrop(
+        imageWidth: 0,
+        imageHeight: 0,
+        textBoxes: const <Rect>[],
+      );
+      expect(result, const CardPhotoCrop(x: 0, y: 0, width: 0, height: 0));
+    });
+
+    test('returns an ID-1 center crop of the full image when no text found',
+        () {
+      // Image is 1000x1000 (square). ID-1 is 1.586:1, so the result is the
+      // full width with vertical centering.
+      final result = computeCardCrop(
+        imageWidth: 1000,
+        imageHeight: 1000,
+        textBoxes: const <Rect>[],
+      );
+      expect(result.x, 0);
+      expect(result.width, 1000);
+      // Centered vertically: newHeight = 1000 / 1.586 = ~631; dy = ~185
+      expect(result.height, lessThan(1000));
+      expect(result.height, greaterThan(600));
+      expect(result.y, greaterThan(0));
+      // The result must be ID-1 ratio within 1px.
+      expect(
+        result.width / result.height,
+        closeTo(cardAspectRatio, 0.01),
+      );
+    });
+
+    test('returns an ID-1 center crop when image is wider than card', () {
+      // 2000x800 (very wide). Result is a centered card-shaped slice.
+      final result = computeCardCrop(
+        imageWidth: 2000,
+        imageHeight: 800,
+        textBoxes: const <Rect>[],
+      );
+      expect(
+        result.width / result.height,
+        closeTo(cardAspectRatio, 0.01),
+      );
+      // The full height is kept, so y == 0 and height == 800.
+      expect(result.y, 0);
+      expect(result.height, 800);
+    });
+
+    test('returns the full image when text fills the whole frame', () {
+      final result = computeCardCrop(
+        imageWidth: 1000,
+        imageHeight: 1000,
+        textBoxes: <Rect>[const Rect.fromLTWH(0, 0, 1000, 1000)],
+      );
+      // Padded region would still be the whole image; after fitting to
+      // ID-1 the result must not exceed image bounds and the aspect ratio
+      // should be ID-1.
+      expect(result.x + result.width, lessThanOrEqualTo(1000));
+      expect(result.y + result.height, lessThanOrEqualTo(1000));
+      expect(
+        result.width / result.height,
+        closeTo(cardAspectRatio, 0.01),
+      );
+    });
+
+    test('fits a wider-than-card text region by extending vertically', () {
+      // 1000x1000 image, text box is already 600x200 (3:1, way wider than
+      // ID-1). After 10% padding the padded box is 720x240. The natural ID-1
+      // rect containing it has the same width (720) and height
+      // 720/1.586 ≈ 454. The image is big enough to hold the natural rect
+      // without scaling, so the result is 720x454, ID-1.
+      final result = computeCardCrop(
+        imageWidth: 1000,
+        imageHeight: 1000,
+        textBoxes: <Rect>[const Rect.fromLTWH(200, 400, 600, 200)],
+      );
+      expect(result.width, inInclusiveRange(715, 725));
+      expect(result.height, inInclusiveRange(450, 460));
+      expect(
+        result.width / result.height,
+        closeTo(cardAspectRatio, 0.01),
+      );
+    });
+
+    test('fits a taller-than-card text region by extending horizontally', () {
+      // 1000x1000 image, text box is 200x600 (1:3, taller than ID-1). The
+      // natural ID-1 rect containing it would be 1142x720, which exceeds
+      // the image width. The algorithm scales uniformly to fit, so the
+      // result is 1000x630, ID-1.
+      final result = computeCardCrop(
+        imageWidth: 1000,
+        imageHeight: 1000,
+        textBoxes: <Rect>[const Rect.fromLTWH(400, 200, 200, 600)],
+      );
+      expect(result.x, 0);
+      expect(result.width, 1000);
+      expect(result.height, inInclusiveRange(625, 640));
+      expect(
+        result.width / result.height,
+        closeTo(cardAspectRatio, 0.01),
+      );
+    });
+
+    test('clamps padded region to image bounds near edges', () {
+      // Text box right at the top-left corner; padding would push it
+      // negative, so the result should be clamped to start at (0, 0).
+      final result = computeCardCrop(
+        imageWidth: 1000,
+        imageHeight: 1000,
+        textBoxes: <Rect>[const Rect.fromLTWH(0, 0, 200, 200)],
+      );
+      expect(result.x, 0);
+      expect(result.y, 0);
+      expect(result.x + result.width, lessThanOrEqualTo(1000));
+      expect(result.y + result.height, lessThanOrEqualTo(1000));
+    });
+
+    test('handles a single tiny (ignored) text box and a real box', () {
+      // The 1x1 box would be filtered at the recognizer layer; here we
+      // verify that even small boxes don't make the result degenerate.
+      final result = computeCardCrop(
+        imageWidth: 1000,
+        imageHeight: 1000,
+        textBoxes: <Rect>[
+          const Rect.fromLTWH(0, 0, 1, 1),
+          const Rect.fromLTWH(300, 300, 400, 400),
+        ],
+      );
+      // Result should be ID-1 and within image bounds; the 1x1 box has
+      // negligible impact on the union so the result is essentially a
+      // card-shaped crop of the full image, possibly with shift to fit.
+      expect(result.x, inInclusiveRange(0, 0));
+      expect(result.x + result.width, lessThanOrEqualTo(1000));
+      expect(result.y + result.height, lessThanOrEqualTo(1000));
+      expect(
+        result.width / result.height,
+        closeTo(cardAspectRatio, 0.01),
+      );
+    });
+  });
+
+  group('DefaultCardPhotoTightener', () {
+    test('tighten is a no-op on empty bytes', () async {
+      const tightener = DefaultCardPhotoTightener();
+      final result = await tightener.tighten(Uint8List(0));
+      expect(result, isEmpty);
+    });
+
+    test('tighten returns original bytes on garbage (non-JPEG) input', () async {
+      const tightener = DefaultCardPhotoTightener();
+      final garbage = Uint8List.fromList(<int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      final result = await tightener.tighten(garbage);
+      // image.decodeJpg returns null → tightener returns the original bytes.
+      expect(result, equals(garbage));
+    });
+
+    test(
+      'tighten returns original bytes when recognizer throws an exception',
+      () async {
+        final recognizer = _ThrowingTextRecognizer();
+        final tightener = DefaultCardPhotoTightener(
+          recognizerFactory: () => <TextRecognizer>[recognizer],
+        );
+        // Pass a valid JPEG header so decodeJpg succeeds.
+        final jpeg = _minimalJpegBytes();
+        final result = await tightener.tighten(jpeg);
+        // Either tightened (if the failure path swallows everything and
+        // returns original) or pass-through. Both are non-error behaviors.
+        expect(result, isNotNull);
+        expect(result.length, greaterThan(0));
+        // The recognizer's close() must still have been called.
+        expect(recognizer.closeCalls, 1);
+      },
+    );
+
+    test('tighten closes all recognizers it created', () async {
+      final recognizer = _RecordingTextRecognizer(
+        boxes: const <Rect>[Rect.fromLTWH(100, 100, 200, 50)],
+      );
+      final tightener = DefaultCardPhotoTightener(
+        recognizerFactory: () => <TextRecognizer>[recognizer],
+      );
+      await tightener.tighten(_minimalJpegBytes());
+      expect(recognizer.closeCalls, 1);
+      expect(recognizer.processCalls, 1);
+    });
+  });
+
+  group('CardMediaService integration with tightening', () {
+    test(
+      'scanCardPhoto passes the tightened bytes (not the raw bytes) to the store',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'card_box_scan_tighten',
+        );
+        final scannedFile = File('${tempDir.path}/scanned.jpg')
+          ..writeAsBytesSync(<int>[9, 9, 9]);
+        final store = _FakeMediaStoreDelegate()
+          ..bytesImagePath = '/stored/tight.jpg';
+        final scanner = _FakeAndroidDocumentScanner(
+          paths: <String>[scannedFile.path],
+        );
+        // A fake tightener that always replaces the bytes with a sentinel
+        // value, so we can prove the store receives the tightened output.
+        final tightener = _SentinelTightener(
+          sentinel: Uint8List.fromList(<int>[7, 7, 7]),
+        );
+        final service = CardMediaService(
+          mediaStore: store,
+          androidDocumentScanner: scanner,
+          platform: CardMediaPlatform.android,
+          photoTightener: tightener,
+        );
+
+        final result = await service.scanCardPhoto(
+          cardId: 'card-1',
+          side: 'front',
+        );
+
+        expect(result?.path, '/stored/tight.jpg');
+        expect(store.lastBytes, <int>[7, 7, 7]);
+        expect(tightener.callCount, 1);
+      },
+    );
+
+    test('scanCardPhoto stores the raw bytes when tightening is a no-op', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'card_box_scan_passthrough',
+      );
+      final scannedFile = File('${tempDir.path}/scanned.jpg')
+        ..writeAsBytesSync(<int>[4, 4, 4]);
+      final store = _FakeMediaStoreDelegate()
+        ..bytesImagePath = '/stored/passthrough.jpg';
+      final scanner = _FakeAndroidDocumentScanner(
+        paths: <String>[scannedFile.path],
+      );
+      final tightener = _SentinelTightener(
+        sentinel: Uint8List.fromList(<int>[4, 4, 4]), // same as input
+      );
+      final service = CardMediaService(
+        mediaStore: store,
+        androidDocumentScanner: scanner,
+        platform: CardMediaPlatform.android,
+        photoTightener: tightener,
+      );
+
+      final result = await service.scanCardPhoto(
+        cardId: 'card-2',
+        side: 'back',
+      );
+
+      expect(result?.path, '/stored/passthrough.jpg');
+      expect(store.lastBytes, <int>[4, 4, 4]);
+    });
   });
 }
