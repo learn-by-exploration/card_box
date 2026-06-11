@@ -69,6 +69,9 @@ Record:
 - Tap `Smart scan`
 - Complete a one-page guided scan if it opens
 - If the guided scanner fails, continue with fallback if offered
+- Confirm the saved image is tightly cropped to the card (ID-1
+  1.586:1 aspect ratio), not the scanner's broad document bounding
+  box. The refinement is on-device and silent.
 
 Record exactly which happened:
 - guided scanner opens and returns image
@@ -77,6 +80,7 @@ Record exactly which happened:
 - fallback appears
 - fallback works
 - error message appears
+- saved image is tightly card-shaped (yes / partial / no)
 
 ### 5. Visiting Card Flow
 

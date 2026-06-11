@@ -195,3 +195,46 @@ Implication:
 
 - Workflows should show permission or consent steps before scan/export actions.
 - Platform services should expose capability checks and permission outcomes.
+
+## DR-011: Smart-Scan Auto-Tightening Via On-Device Text Recognition
+
+Date: 2026-06-11
+
+Decision: The smart-scan result is post-processed on-device by
+`CardPhotoTightener`, which uses ML Kit text recognition (Latin +
+Japanese) to find the card's text region, pads and unions the detected
+text-line boxes, and expands the result to the ID-1 (1.586:1) card
+aspect ratio before re-encoding. The refinement is silent (no new UI)
+and fail-safe: on any failure the original scanner output is returned
+unchanged.
+
+Reasoning:
+
+- The document scanners on Android (ML Kit `GmsDocumentScanner`) and
+  iOS (`VNDocumentCameraViewController`) return a "document" bounding
+  box that typically includes 10-20% of background around the card,
+  which is bad for OCR and for human-readable presentation.
+- ML Kit text recognition is already in the project for the
+  visiting-card OCR step, so the data path is free; no new
+  permissions, no network, and the latency is hidden behind the
+  scanner's existing progress UI.
+- A custom TFLite card-detection model was rejected as out of scope
+  (training data, model hosting, platform bindings). OpenCV-style
+  contour detection was rejected because the `image` package has no
+  Canny/contour API and the user-visible win is small relative to
+  the implementation cost.
+- The ID-1 aspect ratio is the same constant that the manual
+  fallback cropper is locked to (see `cardAspectRatio`), so the
+  output of any smart-scan path is predictably card-shaped.
+
+Implication:
+
+- All smart-scan paths (Android ML Kit, iOS VisionKit, and the
+  Android camera + ID-1 fallback) benefit from the refinement; manual
+  `capturePhoto`, `selectPhoto`, and `editPhoto` are not affected.
+- The `CardPhotoTightener` is a constructor-injected service so the
+  pipeline can be replaced in tests; the geometry is a pure function
+  (`computeCardCrop`) that is unit-tested without spinning up ML Kit.
+- If a future platform integration needs the scanner's unrefined
+  output (e.g. multi-page documents), the `photoTightener` argument
+  can be swapped for a pass-through implementation at the call site.

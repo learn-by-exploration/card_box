@@ -1,6 +1,6 @@
 # Implementation Status
 
-Status: v0.1 prototype started, updated 2026-06-04.
+Status: v0.1 prototype started, updated 2026-06-11.
 
 ## Built
 
@@ -58,6 +58,13 @@ Status: v0.1 prototype started, updated 2026-06-04.
 - Permission-first prototype messaging for camera, NFC, and file flows.
 - Native in-repo settings bridge for NFC settings handoff instead of relying on
   `app_settings`.
+- Smart-scan refinement: the document scanner's auto-cropped JPEG is
+  post-processed on-device by `CardPhotoTightener`, which runs ML Kit
+  text recognition (Latin + Japanese), unions the detected text-line
+  bounding boxes, pads them, and expands the result to the ID-1 card
+  aspect ratio (1.586:1). The tightener is fail-safe and never regresses
+  the existing behavior. Applies to all smart-scan paths (Android ML Kit,
+  iOS VisionKit, and the Android camera + ID-1 fallback).
 
 ## Verified
 

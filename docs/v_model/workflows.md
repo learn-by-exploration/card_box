@@ -14,7 +14,13 @@ Main flow:
 1. User taps add card.
 2. User enters card name and optional issuer/category.
 3. App asks permission before opening camera or NFC interfaces.
-4. User captures front and back photos.
+4. User captures front and back photos. When Smart scan is used, the
+   document scanner's crop is post-processed on-device by the
+   `CardPhotoTightener`, which finds the text region in the captured
+   image and tightens the crop to the ID-1 card aspect ratio so the
+   saved image is always card-shaped and OCR-friendly. The refinement
+   is silent (no new UI) and fall-through safe: if text recognition
+   fails, the original scanner output is kept.
 5. User scans barcode/QR if present or enters it manually.
 6. User optionally runs compatibility test.
 7. User saves the card.

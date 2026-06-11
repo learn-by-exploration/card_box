@@ -1,6 +1,6 @@
 # Traceability Matrix
 
-Status: draft, created 2026-06-03.
+Status: draft, created 2026-06-03; updated 2026-06-11.
 
 | Need / Decision | Requirement IDs | Design Area | Verification |
 | --- | --- | --- | --- |
@@ -17,12 +17,13 @@ Status: draft, created 2026-06-03.
 | Plain JSON prototype export | SYS-010, SYS-016 | Export/import | Export round-trip test |
 | Extensible card categories | SYS-001, SYS-017 | Card catalog | Unit/widget test |
 | Support visiting-card digitization | SYS-018, SYS-019, SYS-020, SYS-021, SYS-022 | OCR pipeline, visiting-card review UI, structured data model | OCR/manual workflow tests |
+| Tighten smart-scan output on-device | SYS-023 | `CardPhotoTightener`, `computeCardCrop` pure geometry, ID-1 aspect ratio constant | Unit geometry tests, integration byte-path test, manual Android/iOS device check |
 
 ## Workflow Traceability
 
 | Workflow | Requirement IDs | Verification |
 | --- | --- | --- |
-| WF-001 Add a new card | SYS-001, SYS-002, SYS-003, SYS-004, SYS-014 | End-to-end add-card test |
+| WF-001 Add a new card | SYS-001, SYS-002, SYS-003, SYS-004, SYS-014, SYS-023 | End-to-end add-card test, including the smart-scan tightening byte path |
 | WF-002 Use barcode/QR card | SYS-003 | Presentation-mode widget/manual test |
 | WF-003 Test RFID/NFC compatibility | SYS-004, SYS-005, SYS-014 | Android device integration test |
 | WF-004 Present reference-only card | SYS-001, SYS-002, SYS-005 | Manual acceptance test |

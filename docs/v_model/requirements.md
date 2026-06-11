@@ -1,6 +1,6 @@
 # Initial Requirements Baseline
 
-Status: draft, created 2026-06-03.
+Status: draft, created 2026-06-03; updated 2026-06-11.
 
 ## User Need
 
@@ -81,6 +81,7 @@ privacy-respecting alternative.
 | SYS-020 | The app shall preserve raw OCR text alongside extracted visiting-card fields. | Unit/widget/integration test |
 | SYS-021 | The app shall require user review before final save of extracted visiting-card fields. | Widget/manual workflow test |
 | SYS-022 | The app shall support structured visiting-card fields including name, company, title, phone, email, website, and address-like text. | Unit/widget/integration test |
+| SYS-023 | The smart-scan output shall be tightened on-device into a card-shaped region before being stored, so the saved image is OCR-friendly and presentable. The refinement shall be fail-safe (original output preserved on any failure) and shall not require new user permissions or network access. | Unit test for `computeCardCrop` geometry, integration test for `CardMediaService.scanCardPhoto` byte path, manual device check on Android/iOS |
 
 ## Platform Constraints
 
