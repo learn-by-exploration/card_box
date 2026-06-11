@@ -104,71 +104,55 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: _HomeMenuAction.archived,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.archive_outlined, size: 18),
-                        const SizedBox(width: 10),
-                        Text(
-                          archivedCount == 0
-                              ? 'Archived cards'
-                              : 'Archived cards ($archivedCount)',
-                        ),
-                      ],
+                    child: _PopupMenuItemRow(
+                      icon: Icons.archive_outlined,
+                      label: archivedCount == 0
+                          ? 'Archived cards'
+                          : 'Archived cards ($archivedCount)',
                     ),
                   ),
                   const PopupMenuItem(
                     value: _HomeMenuAction.summary,
-                    child: Row(
-                      children: [
-                        Icon(Icons.space_dashboard_outlined, size: 18),
-                        SizedBox(width: 10),
-                        Text('Wallet summary'),
-                      ],
+                    child: _PopupMenuItemRow(
+                      icon: Icons.space_dashboard_outlined,
+                      label: 'Wallet summary',
                     ),
                   ),
                   const PopupMenuItem(
                     value: _HomeMenuAction.theme,
-                    child: Row(
-                      children: [
-                        Icon(Icons.palette_outlined, size: 18),
-                        SizedBox(width: 10),
-                        Text('Theme'),
-                      ],
+                    child: _PopupMenuItemRow(
+                      icon: Icons.palette_outlined,
+                      label: 'Theme',
                     ),
                   ),
                   const PopupMenuItem(
                     value: _HomeMenuAction.categories,
-                    child: Row(
-                      children: [
-                        Icon(Icons.category_outlined, size: 18),
-                        SizedBox(width: 10),
-                        Text('Categories'),
-                      ],
+                    child: _PopupMenuItemRow(
+                      icon: Icons.category_outlined,
+                      label: 'Categories',
                     ),
                   ),
                   const PopupMenuItem(
                     value: _HomeMenuAction.backup,
-                    child: Row(
-                      children: [
-                        Icon(Icons.ios_share, size: 18),
-                        SizedBox(width: 10),
-                        Text('Backup and import'),
-                      ],
+                    child: _PopupMenuItemRow(
+                      icon: Icons.ios_share,
+                      label: 'Backup and import',
                     ),
                   ),
                   PopupMenuItem(
                     value: _HomeMenuAction.lock,
-                    child: Row(
-                      children: [
-                        Icon(
-                          widget.appLockService.lockEnabled
-                              ? Icons.lock_outline
-                              : Icons.shield_outlined,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        const Text('App lock'),
-                      ],
+                    child: _PopupMenuItemRow(
+                      icon: widget.appLockService.lockEnabled
+                          ? Icons.lock_outline
+                          : Icons.shield_outlined,
+                      label: 'App lock',
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: _HomeMenuAction.help,
+                    child: _PopupMenuItemRow(
+                      icon: Icons.help_outline_rounded,
+                      label: 'How to add',
                     ),
                   ),
                 ],
@@ -365,15 +349,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 tooltip: 'Search',
                 onPressed: _openSearch,
                 child: const Icon(Icons.search),
-              ),
-              const SizedBox(height: 12),
-              FloatingActionButton.small(
-                heroTag: 'help_fab',
-                tooltip: _browseMode == _BrowseMode.cards
-                    ? 'How to add cards'
-                    : 'How to add contacts',
-                onPressed: _openAddHelp,
-                child: const Icon(Icons.help_outline_rounded),
               ),
               const SizedBox(height: 12),
               FloatingActionButton.extended(
@@ -698,173 +673,200 @@ class _HomeScreenState extends State<HomeScreen> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'More options',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(card.name, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  card.issuer.isEmpty ? card.categoryLabel : card.issuer,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                if (card.hasBarcode)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.fullscreen),
-                    title: const Text('Show code'),
-                    subtitle: const Text(
-                      'Open the full-screen barcode or QR view',
+      isScrollControlled: true,
+      builder: (context) {
+        final maxHeight = MediaQuery.of(context).size.height * 0.82;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'More options',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(this.context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BarcodePresentScreen(card: card),
-                        ),
-                      );
-                    },
                   ),
-                if (!card.hasBarcode && card.hasPhotos)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.credit_card),
-                    title: const Text('Show card'),
-                    subtitle: const Text(
-                      'Open the saved front and back images full screen',
-                    ),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(this.context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CardReferencePresentScreen(card: card),
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 8),
+                  Text(
+                    card.name,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                if (card.isVisitingCard)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.qr_code_2_outlined),
-                    title: const Text('Show contact QR'),
-                    subtitle: const Text(
-                      'Share this contact by letting someone scan a QR code',
-                    ),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(this.context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ContactQrScreen(card: card),
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 4),
+                  Text(
+                    card.issuer.isEmpty ? card.categoryLabel : card.issuer,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.share_outlined),
-                  title: Text(
-                    card.isVisitingCard ? 'Share contact' : 'Share card',
-                  ),
-                  subtitle: Text(
-                    card.isVisitingCard
-                        ? 'Share a contact file through any messenger'
-                        : 'Share a card image or summary through any messenger',
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _shareCard(card);
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.edit_outlined),
-                  title: Text(
-                    card.isVisitingCard ? 'Edit contact' : 'Edit card',
-                  ),
-                  subtitle: Text(
-                    card.isVisitingCard
-                        ? 'Update photos, extracted fields, and notes'
-                        : 'Update details, photos, notes, or codes',
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(this.context).push(
-                      MaterialPageRoute(
-                        builder: (_) => EditCardScreen(
-                          repository: widget.repository,
-                          appLockService: widget.appLockService,
-                          categoryService: widget.categoryService,
-                          mediaRecoveryService: widget.mediaRecoveryService,
-                          existingCard: card,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.visibility_outlined),
-                  title: Text(
-                    card.isVisitingCard ? 'View contact' : 'View details',
-                  ),
-                  subtitle: Text(
-                    card.isVisitingCard
-                        ? 'Open the full contact detail screen'
-                        : 'Open the full card detail screen',
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(this.context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CardDetailScreen(
-                          repository: widget.repository,
-                          appLockService: widget.appLockService,
-                          categoryService: widget.categoryService,
-                          cardId: card.id,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                if (!card.hasBarcode && !card.isVisitingCard)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.nfc),
-                    title: const Text('Test NFC / RFID'),
-                    subtitle: const Text(
-                      'Check whether this phone can read the card',
-                    ),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(this.context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CompatibilityTestScreen(
-                            repository: widget.repository,
-                            appLockService: widget.appLockService,
-                            card: card,
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: ListView(
+                        shrinkWrap: true,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          if (card.hasBarcode)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.fullscreen),
+                              title: const Text('Show code'),
+                              subtitle: const Text(
+                                'Open the full-screen barcode or QR view',
+                              ),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                Navigator.of(this.context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        BarcodePresentScreen(card: card),
+                                  ),
+                                );
+                              },
+                            ),
+                          if (!card.hasBarcode && card.hasPhotos)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.credit_card),
+                              title: const Text('Show card'),
+                              subtitle: const Text(
+                                'Open the saved front and back images full screen',
+                              ),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                Navigator.of(this.context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        CardReferencePresentScreen(card: card),
+                                  ),
+                                );
+                              },
+                            ),
+                          if (card.isVisitingCard)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.qr_code_2_outlined),
+                              title: const Text('Show contact QR'),
+                              subtitle: const Text(
+                                'Share this contact by letting someone scan a QR code',
+                              ),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                Navigator.of(this.context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ContactQrScreen(card: card),
+                                  ),
+                                );
+                              },
+                            ),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.share_outlined),
+                            title: Text(
+                              card.isVisitingCard
+                                  ? 'Share contact'
+                                  : 'Share card',
+                            ),
+                            subtitle: Text(
+                              card.isVisitingCard
+                                  ? 'Share a contact file through any messenger'
+                                  : 'Share a card image or summary through any messenger',
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              _shareCard(card);
+                            },
                           ),
-                        ),
-                      );
-                    },
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.edit_outlined),
+                            title: Text(
+                              card.isVisitingCard
+                                  ? 'Edit contact'
+                                  : 'Edit card',
+                            ),
+                            subtitle: Text(
+                              card.isVisitingCard
+                                  ? 'Update photos, extracted fields, and notes'
+                                  : 'Update details, photos, notes, or codes',
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              Navigator.of(this.context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => EditCardScreen(
+                                    repository: widget.repository,
+                                    appLockService: widget.appLockService,
+                                    categoryService: widget.categoryService,
+                                    mediaRecoveryService:
+                                        widget.mediaRecoveryService,
+                                    existingCard: card,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.visibility_outlined),
+                            title: Text(
+                              card.isVisitingCard
+                                  ? 'View contact'
+                                  : 'View details',
+                            ),
+                            subtitle: Text(
+                              card.isVisitingCard
+                                  ? 'Open the full contact detail screen'
+                                  : 'Open the full card detail screen',
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              Navigator.of(this.context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CardDetailScreen(
+                                    repository: widget.repository,
+                                    appLockService: widget.appLockService,
+                                    categoryService: widget.categoryService,
+                                    cardId: card.id,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          if (!card.hasBarcode && !card.isVisitingCard)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.nfc),
+                              title: const Text('Test NFC / RFID'),
+                              subtitle: const Text(
+                                'Check whether this phone can read the card',
+                              ),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                Navigator.of(this.context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CompatibilityTestScreen(
+                                      repository: widget.repository,
+                                      appLockService: widget.appLockService,
+                                      card: card,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -914,6 +916,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 AppLockSettingsScreen(appLockService: widget.appLockService),
           ),
         );
+      case _HomeMenuAction.help:
+        _openAddHelp();
     }
   }
 
@@ -1128,7 +1132,15 @@ enum _BrowseMode { cards, contacts }
 
 enum _CardLayoutMode { list, grid }
 
-enum _HomeMenuAction { archived, summary, theme, categories, backup, lock }
+enum _HomeMenuAction {
+  archived,
+  summary,
+  theme,
+  categories,
+  backup,
+  lock,
+  help,
+}
 
 class _CategoryFilterOption {
   const _CategoryFilterOption({
@@ -1586,6 +1598,29 @@ class _AddPathTile extends StatelessWidget {
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
+    );
+  }
+}
+
+/// Compact row used inside the three-dot overflow menu. The text is wrapped
+/// in [Flexible] so a long label ellipsizes rather than overflowing the menu's
+/// fixed-width row (a hard 256dp cap imposed by Flutter's popup layout).
+class _PopupMenuItemRow extends StatelessWidget {
+  const _PopupMenuItemRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
     );
   }
 }

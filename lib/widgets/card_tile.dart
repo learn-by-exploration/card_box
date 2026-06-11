@@ -260,11 +260,15 @@ class _MoreAffordance extends StatelessWidget {
               color: colors.onSurfaceVariant,
             ),
             SizedBox(width: tokens.spaceXSmall),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

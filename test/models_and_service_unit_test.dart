@@ -175,12 +175,27 @@ class _FakePhotoEditor implements CardPhotoEditor {
   Object? error;
   String? lastSourcePath;
   String? lastTitle;
+  int cardPhotoCalls = 0;
 
   @override
   Future<CroppedFile?> cropImage({
     required String sourcePath,
     required String title,
   }) async {
+    lastSourcePath = sourcePath;
+    lastTitle = title;
+    if (error != null) {
+      throw error!;
+    }
+    return result;
+  }
+
+  @override
+  Future<CroppedFile?> cropCardPhoto({
+    required String sourcePath,
+    required String title,
+  }) async {
+    cardPhotoCalls += 1;
     lastSourcePath = sourcePath;
     lastTitle = title;
     if (error != null) {
@@ -650,6 +665,9 @@ void main() {
         );
         expect(result?.noticeMessage, contains('scanner unavailable'));
         expect(store.lastBytes, <int>[2, 2, 2]);
+        // The fallback must use the card-shaped cropper so the saved image is
+        // always ID-1 (85.6 / 53.98 mm) and OCR-friendly.
+        expect(editor.cardPhotoCalls, 1);
         expect(await pickedFile.exists(), isFalse);
         expect(await croppedFile.exists(), isFalse);
       },
@@ -753,6 +771,64 @@ void main() {
         expect(result?.noticeMessage, isNull);
         expect(store.lastBytes, <int>[7, 7, 7]);
         expect(await scannedFile.exists(), isFalse);
+      },
+    );
+  });
+
+  group('DefaultCardPhotoEditor', () {
+    test('cardAspectRatio matches the ISO/IEC 7810 ID-1 ratio', () {
+      // ID-1 = 85.60 x 53.98 mm. The cropper uses this constant via the
+      // _IdOneAspectRatioPreset (1586 x 1000) so 85.6 / 53.98 must match.
+      expect(cardAspectRatio, closeTo(85.6 / 53.98, 1e-6));
+    });
+
+    test(
+      'cropCardPhoto locks Android cropper to ID-1 aspect ratio and iOS too',
+      () {
+        const cardPreset = IdOneAspectRatioPreset();
+        final androidSettings = AndroidUiSettings(
+          toolbarTitle: 'Smart scan card',
+          lockAspectRatio: true,
+          hideBottomControls: false,
+          initAspectRatio: cardPreset,
+          aspectRatioPresets: <CropAspectRatioPresetData>[cardPreset],
+        );
+        final iosSettings = IOSUiSettings(
+          title: 'Smart scan card',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          aspectRatioPickerButtonHidden: true,
+          rotateButtonsHidden: false,
+          rotateClockwiseButtonHidden: false,
+          aspectRatioPresets: <CropAspectRatioPresetData>[cardPreset],
+        );
+
+        final androidMap = androidSettings.toMap();
+        expect(androidMap['android.lock_aspect_ratio'], isTrue);
+        expect(androidMap['android.init_aspect_ratio'], 'card_id1');
+        final androidPresets =
+            androidMap['android.aspect_ratio_presets'] as List<dynamic>;
+        expect(androidPresets, hasLength(1));
+        final androidData = androidPresets.first as Map;
+        expect(androidData['name'], 'card_id1');
+        expect(
+          (androidData['data'] as Map)['ratio_x'] /
+              (androidData['data'] as Map)['ratio_y'],
+          closeTo(cardAspectRatio, 1e-3),
+        );
+
+        final iosMap = iosSettings.toMap();
+        expect(iosMap['ios.aspect_ratio_lock_enabled'], isTrue);
+        expect(iosMap['ios.reset_aspect_ratio_enabled'], isFalse);
+        final iosPresets = iosMap['ios.aspect_ratio_presets'] as List<dynamic>;
+        expect(iosPresets, hasLength(1));
+        final iosData = iosPresets.first as Map;
+        expect(iosData['name'], 'card_id1');
+        expect(
+          (iosData['data'] as Map)['ratio_x'] /
+              (iosData['data'] as Map)['ratio_y'],
+          closeTo(cardAspectRatio, 1e-3),
+        );
       },
     );
   });

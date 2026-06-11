@@ -52,8 +52,32 @@ class DefaultCardMediaStoreDelegate implements CardMediaStoreDelegate {
   }
 }
 
+/// ISO/IEC 7810 ID-1 card aspect ratio (85.60mm x 53.98mm).
+const double cardAspectRatio = 85.6 / 53.98;
+
+/// Aspect-ratio preset for the ID-1 card. The image_cropper package does not
+/// expose a direct "lock to custom ratio" parameter, so we use a custom
+/// [CropAspectRatioPresetData] that the Android side maps onto uCrop's
+/// [AspectRatio] constructor (see ImageCropperDelegate.parseAspectRatio).
+class IdOneAspectRatioPreset implements CropAspectRatioPresetData {
+  const IdOneAspectRatioPreset();
+
+  @override
+  String get name => 'card_id1';
+
+  @override
+  (int ratioX, int ratioY)? get data => (1586, 1000);
+}
+
 abstract class CardPhotoEditor {
   Future<CroppedFile?> cropImage({
+    required String sourcePath,
+    required String title,
+  });
+
+  /// Open the cropper locked to the ID-1 card aspect ratio so saved
+  /// images are always card-shaped and OCR-friendly.
+  Future<CroppedFile?> cropCardPhoto({
     required String sourcePath,
     required String title,
   });
@@ -83,6 +107,37 @@ class DefaultCardPhotoEditor implements CardPhotoEditor {
           resetAspectRatioEnabled: true,
           rotateButtonsHidden: false,
           rotateClockwiseButtonHidden: false,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<CroppedFile?> cropCardPhoto({
+    required String sourcePath,
+    required String title,
+  }) {
+    const cardPreset = IdOneAspectRatioPreset();
+    return ImageCropper().cropImage(
+      sourcePath: sourcePath,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 90,
+      uiSettings: <PlatformUiSettings>[
+        AndroidUiSettings(
+          toolbarTitle: title,
+          lockAspectRatio: true,
+          hideBottomControls: false,
+          initAspectRatio: cardPreset,
+          aspectRatioPresets: <CropAspectRatioPresetData>[cardPreset],
+        ),
+        IOSUiSettings(
+          title: title,
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          aspectRatioPickerButtonHidden: true,
+          rotateButtonsHidden: false,
+          rotateClockwiseButtonHidden: false,
+          aspectRatioPresets: <CropAspectRatioPresetData>[cardPreset],
         ),
       ],
     );
@@ -311,7 +366,7 @@ class CardMediaService {
           return null;
         }
 
-        final cropped = await _photoEditor.cropImage(
+        final cropped = await _photoEditor.cropCardPhoto(
           sourcePath: picked.path,
           title: 'Smart scan card',
         );

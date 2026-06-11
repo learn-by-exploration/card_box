@@ -118,7 +118,12 @@ void main() {
       expect(find.text('Library card'), findsOneWidget);
       expect(find.text('Aiko Tanaka'), findsNothing);
 
-      await tester.tap(find.byTooltip('How to add cards'));
+      // Help entry should live inside the three-dot menu, not as a FAB.
+      expect(find.byTooltip('How to add cards'), findsNothing);
+      expect(find.byTooltip('help_fab'), findsNothing);
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('How to add'));
       await tester.pumpAndSettle();
       expect(find.text('How to add a card'), findsOneWidget);
       expect(find.text('Barcode card'), findsOneWidget);
@@ -175,6 +180,73 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('GYM-42'), findsOneWidget);
       expect(find.text('Gym pass'), findsWidgets);
+    });
+
+    testWidgets('"More options" sheet scrolls when many actions are shown', (
+      tester,
+    ) async {
+      // Use a small viewport so the bottom actions fall below the fold.
+      await tester.binding.setSurfaceSize(const Size(360, 540));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final repository = CardRepository(database: createInMemoryDatabase());
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'long-card',
+          name: 'Library card',
+          issuer: 'City Library',
+          category: CardCategory.library,
+          barcodePayload: 'LIB-123',
+          barcodeFormat: 'code128',
+          compatibilityStatus: CompatibilityStatus.barcodeDisplayable,
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
+      final appLockService = await createReadyAppLockService();
+      final categoryService = await createReadyCategoryService(
+        preferences: prefs,
+      );
+      final themeService = await createReadyThemeService(preferences: prefs);
+
+      await tester.pumpWidget(
+        wrapForTest(
+          HomeScreen(
+            repository: repository,
+            appLockService: appLockService,
+            categoryService: categoryService,
+            themeService: themeService,
+            mediaRecoveryService: MediaRecoveryService(preferences: prefs),
+            onRecoveredMediaDiscarded: () async {},
+            onRecoveredMediaUsed: () {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Library card'));
+      await tester.pumpAndSettle();
+
+      // The card tile also shows "More options" as a label, so check the
+      // sheet header specifically via the last occurrence in the tree.
+      expect(find.text('More options'), findsWidgets);
+      expect(find.text('More options').last, findsOneWidget);
+      // Scroll affordance (Scrollbar) is rendered in the sheet.
+      expect(find.byType(Scrollbar), findsOneWidget);
+      // First action is visible without scrolling.
+      expect(find.text('Show code'), findsOneWidget);
+      // Bottom actions must be reachable by scrolling.
+      await tester.scrollUntilVisible(
+        find.text('View details'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('View details'), findsOneWidget);
+      // All listed actions are now present in the tree.
+      expect(find.text('Share card'), findsOneWidget);
+      expect(find.text('Edit card'), findsOneWidget);
     });
 
     testWidgets('recovered media card can be discarded from home', (
