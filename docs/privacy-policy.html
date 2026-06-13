@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy – Card Box</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      background: #fafafa;
+      line-height: 1.7;
+      padding: 0 16px 48px;
+    }
+    header {
+      background: #1F6FEB;
+      color: #fff;
+      padding: 32px 24px;
+      margin: 0 -16px 40px;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 700; }
+    header p  { font-size: 0.9rem; opacity: 0.85; margin-top: 6px; }
+    main { max-width: 760px; margin: 0 auto; }
+    h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #1F6FEB;
+      margin: 32px 0 10px;
+      border-bottom: 2px solid #e3edfd;
+      padding-bottom: 6px;
+    }
+    p, li { font-size: 0.95rem; color: #333; margin-top: 8px; }
+    ul { padding-left: 1.4em; margin-top: 8px; }
+    ul li { margin-top: 6px; }
+    .badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .badge.red { background: #fce4ec; color: #c62828; border-color: #ef9a9a; }
+    footer {
+      margin-top: 56px;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+      font-size: 0.8rem;
+      color: #888;
+      text-align: center;
+    }
+    a { color: #1F6FEB; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Privacy Policy</h1>
+  <p>Card Box &nbsp;·&nbsp; Effective date: June 2026 &nbsp;·&nbsp; Last updated: June 2026</p>
+</header>
+
+<main>
+
+  <p>
+    This Privacy Policy describes how <strong>Card Box</strong>
+    ("<em>we</em>", "<em>us</em>", or "<em>our</em>") handles information when
+    you use our mobile application. Card Box is a local-first card organiser
+    for non-bank cards — loyalty, membership, library, ID, transit, gift, and
+    visiting — designed for all ages, including children.
+  </p>
+
+  <p class="badge">✓ We do NOT collect, store, or share any personal data</p>
+
+  <!-- ── 1. Information We Collect ── -->
+  <h2>1. Information We Collect</h2>
+  <p><strong>We collect no personal information.</strong></p>
+  <p>
+    Card Box operates entirely on your device. The only data the app stores are:
+  </p>
+  <ul>
+    <li>Your card entries (name, barcode/QR payload, optional notes, and
+        optional front/back photos) saved locally in an encrypted SQLite
+        database on your device.</li>
+    <li>App preferences (theme, biometric/PIN lock, sort order, custom
+        categories) saved locally on your device via Android's
+        SharedPreferences storage.</li>
+    <li>The encryption key that protects the database above, held in
+        Android's hardware-backed keystore.</li>
+  </ul>
+  <p>
+    This data never leaves your device. It is not transmitted to any server,
+    cloud service, or third party.
+  </p>
+
+  <!-- ── 2. Internet Access ── -->
+  <h2>2. Internet &amp; Network Access</h2>
+  <p>
+    Card Box does <strong>not</strong> hold the Android
+    <code>INTERNET</code> permission. The app cannot make any network request
+    — for telemetry, crash reporting, advertising, analytics, sync, or any
+    other purpose. The only Android permissions the app requests are
+    <code>CAMERA</code> (for scanning barcodes/QR codes and capturing the
+    front and back of a card), <code>NFC</code> (for reading contactless
+    cards), and <code>USE_BIOMETRIC</code> (for the optional app lock).
+  </p>
+
+  <!-- ── 3. Advertising ── -->
+  <h2>3. Advertising</h2>
+  <p class="badge">No ads</p>
+  <p>
+    Card Box contains <strong>no advertisements</strong> of any kind. We do not
+    integrate any advertising SDK, ad network, or monetisation framework.
+  </p>
+
+  <!-- ── 4. Third-Party SDKs and Services ── -->
+  <h2>4. Third-Party SDKs &amp; Services</h2>
+  <p>
+    Card Box integrates the Flutter framework and the following on-device
+    Flutter plugins:
+  </p>
+  <ul>
+    <li><code>flutter_secure_storage</code> — stores the database encryption
+        key in Android's hardware-backed keystore.</li>
+    <li><code>shared_preferences</code> — stores app preferences.</li>
+    <li><code>mobile_scanner</code> + Google ML Kit text recognition —
+        <strong>on-device only</strong>. The camera frame is processed in
+        memory and never leaves the device.</li>
+    <li><code>nfc_manager</code> — reads contactless card identifiers via the
+        device's NFC radio. The read is local and not transmitted.</li>
+    <li><code>Drift</code> + <code>sqlite3</code> — local database engine.</li>
+  </ul>
+  <p>
+    No analytics, crash-reporting, social-login, advertising, or any other
+    third-party SDK that transmits data is included in the app.
+  </p>
+
+  <!-- ── 5. Children's Privacy (COPPA) ── -->
+  <h2>5. Children's Privacy (COPPA Compliance)</h2>
+  <p>
+    Card Box is designed to be safe for users of all ages, including children
+    under 13. We comply with the United States
+    <em>Children's Online Privacy Protection Act (COPPA)</em>:
+  </p>
+  <ul>
+    <li>We do <strong>not</strong> collect any personal information from any
+        user, including children under 13.</li>
+    <li>We do <strong>not</strong> require account registration or login.</li>
+    <li>We do <strong>not</strong> display advertisements.</li>
+    <li>We do <strong>not</strong> allow in-app purchases.</li>
+    <li>We do <strong>not</strong> include social features, chat, or
+        user-generated content.</li>
+    <li>All content in Card Box is appropriate for all ages.</li>
+  </ul>
+  <p class="badge">✓ COPPA Compliant — no data collected from any user</p>
+
+  <!-- ── 6. GDPR ── -->
+  <h2>6. EU General Data Protection Regulation (GDPR)</h2>
+  <p>
+    Because we collect no personal data, Card Box has no processing activities
+    that require a legal basis under the GDPR. There is no personal data to
+    access, rectify, erase, or port. Users in the European Economic Area (EEA)
+    have no data stored by us to exercise rights over.
+  </p>
+  <p class="badge">✓ GDPR Compliant — no personal data processed</p>
+
+  <!-- ── 7. Google Play Families Policy ── -->
+  <h2>7. Google Play Families Policy</h2>
+  <p>
+    Card Box is designed to comply with Google Play's Families Policy:
+  </p>
+  <ul>
+    <li>All content is appropriate for children of all ages.</li>
+    <li>The app contains no violence, sexual content, horror, or mature themes.</li>
+    <li>No ads are shown to any user.</li>
+    <li>No data is collected from any user, including children.</li>
+    <li>No third-party SDKs that could compromise children's privacy are
+        integrated.</li>
+    <li>No in-app purchases are present.</li>
+  </ul>
+
+  <!-- ── 8. Data Security ── -->
+  <h2>8. Data Security</h2>
+  <p>
+    Because Card Box stores everything on your own device, your data is
+    protected by your device's own security mechanisms (full-disk
+    encryption, screen lock, etc.) plus Card Box's local protections:
+  </p>
+  <ul>
+    <li>The card database is stored in an encrypted SQLite file. The
+        encryption key is held in Android's hardware-backed keystore
+        (TEE/StrongBox where available).</li>
+    <li>An optional app lock (PIN or device biometric) is offered in
+        Settings. When enabled, the app must be unlocked on resume.</li>
+    <li>An in-app <em>Erase all data</em> action in Settings permanently
+        wipes the database and key material from the device.</li>
+  </ul>
+  <p>
+    We have no servers and therefore no server-side data that could be
+    breached.
+  </p>
+
+  <!-- ── 9. Data Retention ── -->
+  <h2>9. Data Retention &amp; Deletion</h2>
+  <p>
+    Local data (your card entries and preferences) is retained on your device
+    until you uninstall the app or use the in-app <em>Erase all data</em>
+    action. Either action permanently removes all locally stored app data
+    from your device. Encrypted backups you choose to export are your
+    responsibility to keep or destroy.
+  </p>
+
+  <!-- ── 10. Changes ── -->
+  <h2>10. Changes to This Policy</h2>
+  <p>
+    We may update this Privacy Policy from time to time. When we do, we will
+    update the "Last updated" date at the top of this page. Continued use of
+    the app after any changes constitutes acceptance of the revised policy.
+    Significant changes that affect children's data (if we ever begin
+    collecting any) will be communicated via an in-app notice.
+  </p>
+
+  <!-- ── 11. Contact ── -->
+  <h2>11. Contact Us</h2>
+  <p>
+    If you have any questions about this Privacy Policy or our data practices,
+    please contact us through our
+    <a href="https://play.google.com/store/apps/details?id=com.cardbox.card_box"
+       rel="noopener noreferrer">Google Play Store listing</a>
+    or open an issue on our
+    <a href="https://github.com/learn-by-exploration/CardBox"
+       rel="noopener noreferrer">GitHub repository</a>.
+  </p>
+
+</main>
+
+<footer>
+  <p>© 2026 Card Box &nbsp;·&nbsp;
+     <a href="data-safety.html">Data Safety</a>
+  </p>
+</footer>
+</body>
+</html>
