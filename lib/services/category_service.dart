@@ -11,6 +11,22 @@ class CategoryService extends ChangeNotifier {
   final SharedPreferences _preferences;
   final List<String> _customCategories = <String>[];
 
+  /// Hook called whenever a rename actually changes a category label.
+  /// The repository installs this so cards whose `customCategory`
+  /// string equals [fromLabel] can be rewritten in lockstep with
+  /// the rename. The service must not depend on the repository
+  /// directly, so the wiring is opt-in.
+  Future<void> Function(String fromLabel, String toLabel)?
+      _categoryMigrationHook;
+
+  /// Installs (or clears) the migration hook. Pass `null` to remove
+  /// the hook — useful in tests and on disposal.
+  Future<void> setCategoryMigrationHook(
+    Future<void> Function(String fromLabel, String toLabel)? hook,
+  ) async {
+    _categoryMigrationHook = hook;
+  }
+
   List<String> get customCategories => List.unmodifiable(_customCategories);
 
   Future<void> init() async {
@@ -52,6 +68,10 @@ class CategoryService extends ChangeNotifier {
     }
     final currentLabel = _customCategories[index];
     if (currentLabel.toLowerCase() == toNormalized.toLowerCase()) {
+      // No real change — the only thing that happened is whitespace
+      // was normalized. Skip the migration hook: there is nothing
+      // for cards to follow. The notification still fires so
+      // listeners see the canonical form of the label.
       if (currentLabel == toNormalized) {
         return true;
       }
@@ -72,6 +92,15 @@ class CategoryService extends ChangeNotifier {
     );
     await _persist();
     notifyListeners();
+    // Fire the migration hook only after the rename is durable so
+    // a hook crash cannot leave the label renamed without the
+    // cards following. The hook is allowed to throw — that means
+    // the cards were not migrated, which is preferable to a
+    // half-applied state.
+    final hook = _categoryMigrationHook;
+    if (hook != null) {
+      await hook(fromNormalized, toNormalized);
+    }
     return true;
   }
 

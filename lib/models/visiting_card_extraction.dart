@@ -8,6 +8,7 @@ class VisitingCardExtraction {
     required this.suggestedWebsites,
     required this.suggestedAddress,
     required this.rawOcrText,
+    this.hadRecognizerFailure = false,
   });
 
   final String suggestedName;
@@ -18,4 +19,10 @@ class VisitingCardExtraction {
   final List<String> suggestedWebsites;
   final String suggestedAddress;
   final String rawOcrText;
+
+  /// True when at least one of the text recognizers threw during
+  /// the OCR run. The caller can use this to surface a one-time
+  /// "OCR didn't return anything" hint instead of leaving the
+  /// user staring at an empty form.
+  final bool hadRecognizerFailure;
 }

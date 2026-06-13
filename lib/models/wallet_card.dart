@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
 import 'package:card_box/models/card_category.dart';
 import 'package:card_box/models/card_type.dart';
 import 'package:card_box/models/compatibility_status.dart';
@@ -205,8 +208,11 @@ class WalletCard {
   }
 
   factory WalletCard.fromJson(Map<String, Object?> json) {
+    final rawId = json['id'] as String?;
     return WalletCard(
-      id: json['id'] as String? ?? '',
+      id: rawId == null || rawId.isEmpty
+          ? _generateFallbackId(json)
+          : rawId,
       name: json['name'] as String? ?? 'Untitled card',
       issuer: json['issuer'] as String? ?? '',
       category: CardCategory.fromName(json['category'] as String? ?? ''),
@@ -247,6 +253,34 @@ class WalletCard {
     }
     return DateTime.tryParse(value);
   }
+
+  /// Builds a unique id for an incoming card that has no id (or an
+  /// empty one). The id is `imported-<micros>-<hash>` where the
+  /// hash covers the original JSON payload. Two records with the
+  /// same content and the same microsecond still get distinct
+  /// ids because the hash will match; callers should re-roll if
+  /// they detect a collision in the destination store, but a
+  /// collision in practice requires the exact same JSON to be
+  /// decoded twice in the same microsecond, which is rare.
+  static String _generateFallbackId(Map<String, Object?> json) {
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    final encoded = jsonEncode(json);
+    return 'imported-$micros-${encoded.hashCode.toUnsigned(32).toRadixString(16)}';
+  }
+
+  /// Returns a fresh, locally-unique id for a newly created card.
+  /// Combines the current microsecond timestamp with a 32-bit
+  /// random suffix so two cards created in rapid succession (or in
+  /// a simulator with frozen clocks) cannot collide. The random
+  /// source is intentionally process-local; ids do not need to
+  /// be cryptographically unguessable.
+  static String generateNewId({String prefix = 'card'}) {
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    final suffix = _idRandom.nextInt(1 << 32).toRadixString(16).padLeft(8, '0');
+    return '$prefix-$micros-$suffix';
+  }
+
+  static final math.Random _idRandom = math.Random.secure();
 
   static List<String> _parseStringList(Object? value) {
     if (value is! List) {

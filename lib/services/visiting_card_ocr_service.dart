@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'package:card_box/models/visiting_card_extraction.dart';
@@ -138,21 +139,40 @@ class VisitingCardOcrService {
       TextRecognizer(script: TextRecognitionScript.latin),
       TextRecognizer(script: TextRecognitionScript.japanese),
     ];
+    var hadRecognizerFailure = false;
     try {
       final allLines = <String>[];
       for (final recognizer in recognizers) {
-        allLines.addAll(
-          await _recognizeLinesSafely(recognizer, frontImagePath),
+        final (lines, failed) = await _recognizeLinesSafely(
+          recognizer,
+          frontImagePath,
         );
+        allLines.addAll(lines);
+        hadRecognizerFailure = hadRecognizerFailure || failed;
       }
       if (backImagePath != null && backImagePath.trim().isNotEmpty) {
         for (final recognizer in recognizers) {
-          allLines.addAll(
-            await _recognizeLinesSafely(recognizer, backImagePath),
+          final (lines, failed) = await _recognizeLinesSafely(
+            recognizer,
+            backImagePath,
           );
+          allLines.addAll(lines);
+          hadRecognizerFailure = hadRecognizerFailure || failed;
         }
       }
-      return parseRecognizedLines(allLines);
+      final parsed = parseRecognizedLines(allLines);
+      return VisitingCardExtraction(
+        suggestedName: parsed.suggestedName,
+        suggestedCompany: parsed.suggestedCompany,
+        suggestedTitle: parsed.suggestedTitle,
+        suggestedPhones: parsed.suggestedPhones,
+        suggestedEmails: parsed.suggestedEmails,
+        suggestedWebsites: parsed.suggestedWebsites,
+        suggestedAddress: parsed.suggestedAddress,
+        rawOcrText: parsed.rawOcrText,
+        hadRecognizerFailure:
+            hadRecognizerFailure || parsed.hadRecognizerFailure,
+      );
     } finally {
       for (final recognizer in recognizers) {
         await recognizer.close();
@@ -214,14 +234,18 @@ class VisitingCardOcrService {
     );
   }
 
-  Future<List<String>> _recognizeLinesSafely(
+  Future<(List<String>, bool)> _recognizeLinesSafely(
     TextRecognizer recognizer,
     String imagePath,
   ) async {
     try {
-      return await _recognizeLines(recognizer, imagePath);
-    } catch (_) {
-      return const <String>[];
+      final lines = await _recognizeLines(recognizer, imagePath);
+      return (lines, false);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('VisitingCardOcr: _recognizeLines failed, returning empty: $error');
+      }
+      return (const <String>[], true);
     }
   }
 

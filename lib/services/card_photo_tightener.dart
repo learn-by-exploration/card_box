@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Offset, Rect;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
@@ -15,13 +15,51 @@ import 'package:card_box/services/card_media_service.dart' show cardAspectRatio;
 /// proxy for the card's location — we run on-device text recognition, union
 /// the text-line bounding boxes, then fit the union to the ID-1 card aspect
 /// ratio so the saved image is always card-shaped and OCR-friendly.
+/// Outcome of an attempt to tighten a scanned card photo. The
+/// `bytes` are always usable — either the tightened crop or the
+/// original bytes when no improvement was possible. `reason`
+/// tells the UI *why* no improvement was made so it can surface a
+/// one-time "auto-crop wasn't applied" hint without showing
+/// anything when everything worked.
+class TightenResult {
+  const TightenResult({
+    required this.bytes,
+    required this.reason,
+  });
+
+  final Uint8List bytes;
+  final TightenReason reason;
+}
+
+enum TightenReason {
+  /// Tightening succeeded and the bytes are a tighter crop.
+  tightened,
+
+  /// No crop was necessary — the image was already card-shaped
+  /// (or smaller than the crop window), so the original bytes
+  /// are returned unchanged.
+  noChange,
+
+  /// The image could not be decoded as a JPEG.
+  decodeFailed,
+
+  /// The recognizer could not detect any text on the image, so
+  /// there was no basis to compute a tighter region.
+  noTextDetected,
+
+  /// A recognizer or other internal step threw. The original
+  /// bytes are returned.
+  internalError,
+}
+
 abstract class CardPhotoTightener {
-  /// Returns a tighter, card-shaped JPEG. On any failure (decode error,
-  /// recognizer crash, crop out of bounds) returns the original bytes
-  /// unchanged. This method is fail-safe by contract: smart scan is a
-  /// best-effort feature and tightening is an improvement on top of it,
-  /// not a requirement.
-  Future<Uint8List> tighten(Uint8List jpegBytes);
+  /// Returns a [TightenResult] whose `bytes` are the tightest
+  /// card-shaped crop the tightener could produce, or the original
+  /// bytes when no improvement was possible. This method is
+  /// fail-safe by contract: smart scan is a best-effort feature
+  /// and tightening is an improvement on top of it, not a
+  /// requirement.
+  Future<TightenResult> tighten(Uint8List jpegBytes);
 }
 
 /// Factory that produces the list of text recognizers used during
@@ -44,19 +82,28 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
       ];
 
   @override
-  Future<Uint8List> tighten(Uint8List jpegBytes) async {
+  Future<TightenResult> tighten(Uint8List jpegBytes) async {
     if (jpegBytes.isEmpty) {
-      return jpegBytes;
+      return TightenResult(
+        bytes: jpegBytes,
+        reason: TightenReason.noChange,
+      );
     }
     try {
       final decoded = img.decodeJpg(jpegBytes);
       if (decoded == null) {
-        return jpegBytes;
+        return TightenResult(
+          bytes: jpegBytes,
+          reason: TightenReason.decodeFailed,
+        );
       }
       final imageWidth = decoded.width;
       final imageHeight = decoded.height;
       if (imageWidth == 0 || imageHeight == 0) {
-        return jpegBytes;
+        return TightenResult(
+          bytes: jpegBytes,
+          reason: TightenReason.decodeFailed,
+        );
       }
 
       final tempPath =
@@ -71,10 +118,22 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
         if (await tempFile.exists()) {
           try {
             await tempFile.delete();
-          } catch (_) {
-            // best-effort cleanup
+          } catch (error) {
+            if (kDebugMode) {
+              debugPrint('PhotoTightener: best-effort temp delete failed: $error');
+            }
           }
         }
+      }
+
+      // If we found no text on the image, there is no basis to
+      // compute a tighter region. The caller can choose to surface
+      // a one-time hint via the reason field.
+      if (textBoxes.isEmpty) {
+        return TightenResult(
+          bytes: jpegBytes,
+          reason: TightenReason.noTextDetected,
+        );
       }
 
       final crop = computeCardCrop(
@@ -88,7 +147,10 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
           crop.y == 0 &&
           crop.width == imageWidth &&
           crop.height == imageHeight) {
-        return jpegBytes;
+        return TightenResult(
+          bytes: jpegBytes,
+          reason: TightenReason.noChange,
+        );
       }
 
       final cropped = img.copyCrop(
@@ -98,9 +160,18 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
         width: crop.width,
         height: crop.height,
       );
-      return Uint8List.fromList(img.encodeJpg(cropped, quality: 92));
-    } catch (_) {
-      return jpegBytes;
+      return TightenResult(
+        bytes: Uint8List.fromList(img.encodeJpg(cropped, quality: 92)),
+        reason: TightenReason.tightened,
+      );
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('PhotoTightener: crop failed, using original bytes: $error');
+      }
+      return TightenResult(
+        bytes: jpegBytes,
+        reason: TightenReason.internalError,
+      );
     }
   }
 
@@ -112,8 +183,11 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
         RecognizedText result;
         try {
           result = await recognizer.processImage(image);
-        } catch (_) {
+        } catch (error) {
           // A single recognizer failing should not abort tightening.
+          if (kDebugMode) {
+            debugPrint('PhotoTightener: recognizer.processImage failed: $error');
+          }
           continue;
         }
         for (final block in result.blocks) {
@@ -130,8 +204,10 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
       for (final recognizer in recognizers) {
         try {
           await recognizer.close();
-        } catch (_) {
-          // best-effort cleanup
+        } catch (error) {
+          if (kDebugMode) {
+            debugPrint('PhotoTightener: recognizer.close failed: $error');
+          }
         }
       }
     }
