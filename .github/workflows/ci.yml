@@ -38,7 +38,11 @@ jobs:
         run: flutter pub get
 
       - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed .
+        # Scope to lib/ and test/ — the vendored third_party/
+        # packages (mobile_scanner, nfc_manager) are kept
+        # byte-identical to upstream on purpose, so they are
+        # excluded from the format check.
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze
         run: flutter analyze --fatal-infos
