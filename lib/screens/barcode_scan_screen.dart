@@ -33,6 +33,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       const DeviceSettingsService();
   late MobileScannerController _controller;
   _ScanMode _scanMode = _ScanMode.barcode;
+
   /// Completes when the active controller has finished disposing.
   /// The lifecycle observer (and any pending stop/restart) must
   /// await this before touching the controller, otherwise a fast

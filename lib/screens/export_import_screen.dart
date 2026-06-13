@@ -207,8 +207,8 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
       final missingSuffix = summary.missingImages.isEmpty
           ? ''
           : ' ${summary.missingImages.length} image(s) could not be '
-              'included because the file was missing — re-importing '
-              'this backup on the original device will restore them.';
+                'included because the file was missing — re-importing '
+                'this backup on the original device will restore them.';
       setState(() {
         _latestBackup = backup;
         _message =

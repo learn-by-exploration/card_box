@@ -243,7 +243,9 @@ class VisitingCardOcrService {
       return (lines, false);
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('VisitingCardOcr: _recognizeLines failed, returning empty: $error');
+        debugPrint(
+          'VisitingCardOcr: _recognizeLines failed, returning empty: $error',
+        );
       }
       return (const <String>[], true);
     }

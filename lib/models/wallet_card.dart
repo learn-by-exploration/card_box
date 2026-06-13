@@ -171,9 +171,7 @@ class WalletCard {
       contactAddress: contactAddress ?? this.contactAddress,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      lastUsedAt: clearLastUsedAt
-          ? null
-          : lastUsedAt ?? this.lastUsedAt,
+      lastUsedAt: clearLastUsedAt ? null : lastUsedAt ?? this.lastUsedAt,
       useCount: useCount ?? this.useCount,
     );
   }
@@ -217,9 +215,7 @@ class WalletCard {
   factory WalletCard.fromJson(Map<String, Object?> json) {
     final rawId = json['id'] as String?;
     return WalletCard(
-      id: rawId == null || rawId.isEmpty
-          ? _generateFallbackId(json)
-          : rawId,
+      id: rawId == null || rawId.isEmpty ? _generateFallbackId(json) : rawId,
       name: json['name'] as String? ?? 'Untitled card',
       issuer: json['issuer'] as String? ?? '',
       category: CardCategory.fromName(json['category'] as String? ?? ''),

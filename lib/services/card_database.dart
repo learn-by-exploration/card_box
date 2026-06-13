@@ -42,22 +42,22 @@ class CardDatabase extends _$CardDatabase {
   /// preserve any in-flight row data.
   static const List<String> _v1ToV2AlterStatements = <String>[
     "ALTER TABLE card_records ADD COLUMN name_text TEXT NOT NULL "
-    "DEFAULT ''",
+        "DEFAULT ''",
     "ALTER TABLE card_records ADD COLUMN issuer_text TEXT NOT NULL "
-    "DEFAULT ''",
+        "DEFAULT ''",
     "ALTER TABLE card_records ADD COLUMN category_name TEXT NOT NULL "
-    "DEFAULT 'other'",
+        "DEFAULT 'other'",
     'ALTER TABLE card_records ADD COLUMN custom_category_text TEXT',
     "ALTER TABLE card_records ADD COLUMN card_type_name TEXT NOT NULL "
-    "DEFAULT 'standard'",
+        "DEFAULT 'standard'",
     "ALTER TABLE card_records ADD COLUMN compatibility_status_name "
-    "TEXT NOT NULL DEFAULT 'untested'",
+        "TEXT NOT NULL DEFAULT 'untested'",
     "ALTER TABLE card_records ADD COLUMN search_text TEXT NOT NULL "
-    "DEFAULT ''",
+        "DEFAULT ''",
     'ALTER TABLE card_records ADD COLUMN is_archived INTEGER NOT NULL '
-    'DEFAULT 0',
+        'DEFAULT 0',
     'ALTER TABLE card_records ADD COLUMN is_favorite INTEGER NOT NULL '
-    'DEFAULT 0',
+        'DEFAULT 0',
   ];
 
   @override
@@ -94,10 +94,7 @@ class CardDatabase extends _$CardDatabase {
         await migrator.dropColumn(cardRecords, 'category_name');
         await migrator.dropColumn(cardRecords, 'custom_category_text');
         await migrator.dropColumn(cardRecords, 'card_type_name');
-        await migrator.dropColumn(
-          cardRecords,
-          'compatibility_status_name',
-        );
+        await migrator.dropColumn(cardRecords, 'compatibility_status_name');
         await migrator.dropColumn(cardRecords, 'search_text');
         await migrator.dropColumn(cardRecords, 'is_archived');
         await migrator.dropColumn(cardRecords, 'is_favorite');

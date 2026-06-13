@@ -308,7 +308,7 @@ class ImportRecordingCardDatabase extends CardDatabase {
 /// the database with a different card first.
 class UpsertThrowingCardDatabase extends CardDatabase {
   UpsertThrowingCardDatabase({this.throwForId = ''})
-      : super(NativeDatabase.memory());
+    : super(NativeDatabase.memory());
 
   /// When set to a non-empty value, `upsertCard` throws if the
   /// incoming card's id matches. Empty disables the throw.
@@ -374,7 +374,8 @@ class ConcurrentRecordingCardDatabase extends CardDatabase {
 /// Used to assert the ordering of side effects relative to a paired
 /// database recording.
 class RecordingCardMediaManager extends CardMediaManager {
-  final List<({String path, DateTime at})> deletes = <({String path, DateTime at})>[];
+  final List<({String path, DateTime at})> deletes =
+      <({String path, DateTime at})>[];
   final List<({String path, DateTime at})> existsChecks =
       <({String path, DateTime at})>[];
 
@@ -398,8 +399,7 @@ class RecordingCardMediaManager extends CardMediaManager {
     required String side,
     required Uint8List bytes,
     required String extension,
-  }) async =>
-      '/imported/${cardId}_$side$extension';
+  }) async => '/imported/${cardId}_$side$extension';
 }
 
 Widget wrapForTest(Widget child) {

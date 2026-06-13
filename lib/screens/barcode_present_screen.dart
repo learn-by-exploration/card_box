@@ -11,6 +11,7 @@ class BarcodePresentScreen extends StatefulWidget {
   const BarcodePresentScreen({super.key, required this.card, this.onShown});
 
   final WalletCard card;
+
   /// Optional callback fired once when the screen first renders.
   /// Used to record that the card was used (marking lastUsedAt and
   /// useCount). The returned future is awaited inside the post-frame
@@ -39,7 +40,9 @@ class _BarcodePresentScreenState extends State<BarcodePresentScreen> {
         try {
           await WakelockPlus.enable();
         } catch (error) {
-          debugPrint('BarcodePresentScreen: WakelockPlus.enable failed: $error');
+          debugPrint(
+            'BarcodePresentScreen: WakelockPlus.enable failed: $error',
+          );
           _wakelockAcquired = false;
         }
       }
@@ -63,9 +66,13 @@ class _BarcodePresentScreenState extends State<BarcodePresentScreen> {
       // Best-effort: a stuck wakelock is auto-cleared on Android when
       // the Activity is destroyed, but on iOS the idleTimerDisabled
       // flag would otherwise outlive this screen.
-      unawaited(WakelockPlus.disable().catchError((Object error) {
-        debugPrint('BarcodePresentScreen: WakelockPlus.disable failed: $error');
-      }));
+      unawaited(
+        WakelockPlus.disable().catchError((Object error) {
+          debugPrint(
+            'BarcodePresentScreen: WakelockPlus.disable failed: $error',
+          );
+        }),
+      );
     }
     super.dispose();
   }

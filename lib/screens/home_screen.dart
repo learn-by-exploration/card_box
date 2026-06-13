@@ -135,9 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       FilterChip(
                         avatar: Icon(
-                          _favoritesOnly
-                              ? Icons.star
-                              : Icons.star_border,
+                          _favoritesOnly ? Icons.star : Icons.star_border,
                           size: 18,
                           color: _favoritesOnly
                               ? Theme.of(context).colorScheme.primary
@@ -253,8 +251,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openCategoryPicker(List<WalletCard> cards) async {
     final options = _categoryFilterOptions(cards);
-    final allCategoriesCount =
-        cards.where((card) => !card.isVisitingCard).length;
+    final allCategoriesCount = cards
+        .where((card) => !card.isVisitingCard)
+        .length;
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -470,14 +469,15 @@ class _HomeScreenState extends State<HomeScreen> {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.fullscreen),
           title: const Text('Show code'),
-          subtitle: const Text(
-            'Open the full-screen barcode or QR view',
-          ),
+          subtitle: const Text('Open the full-screen barcode or QR view'),
           onTap: () {
             Navigator.of(sheetContext).pop();
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => BarcodePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id)),
+                builder: (_) => BarcodePresentScreen(
+                  card: card,
+                  onShown: () => widget.repository.markUsed(card.id),
+                ),
               ),
             );
           },
@@ -494,7 +494,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.of(sheetContext).pop();
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => CardReferencePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id)),
+                builder: (_) => CardReferencePresentScreen(
+                  card: card,
+                  onShown: () => widget.repository.markUsed(card.id),
+                ),
               ),
             );
           },
@@ -510,18 +513,14 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () {
             Navigator.of(sheetContext).pop();
             Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ContactQrScreen(card: card),
-              ),
+              MaterialPageRoute(builder: (_) => ContactQrScreen(card: card)),
             );
           },
         ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.share_outlined),
-        title: Text(
-          card.isVisitingCard ? 'Share contact' : 'Share card',
-        ),
+        title: Text(card.isVisitingCard ? 'Share contact' : 'Share card'),
         subtitle: Text(
           card.isVisitingCard
               ? 'Share a contact file through any messenger'
@@ -547,9 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.edit_outlined),
-        title: Text(
-          card.isVisitingCard ? 'Edit contact' : 'Edit card',
-        ),
+        title: Text(card.isVisitingCard ? 'Edit contact' : 'Edit card'),
         subtitle: Text(
           card.isVisitingCard
               ? 'Update photos, extracted fields, and notes'
@@ -573,9 +570,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.visibility_outlined),
-        title: Text(
-          card.isVisitingCard ? 'View contact' : 'View details',
-        ),
+        title: Text(card.isVisitingCard ? 'View contact' : 'View details'),
         subtitle: Text(
           card.isVisitingCard
               ? 'Open the full contact detail screen'
@@ -600,9 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.nfc),
           title: const Text('Test NFC / RFID'),
-          subtitle: const Text(
-            'Check whether this phone can read the card',
-          ),
+          subtitle: const Text('Check whether this phone can read the card'),
           onTap: () {
             Navigator.of(sheetContext).pop();
             Navigator.of(context).push(
@@ -796,14 +789,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showCardCode(WalletCard card) async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id))));
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BarcodePresentScreen(
+          card: card,
+          onShown: () => widget.repository.markUsed(card.id),
+        ),
+      ),
+    );
   }
 
   Future<void> _showCardImages(WalletCard card) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => CardReferencePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id))),
+      MaterialPageRoute(
+        builder: (_) => CardReferencePresentScreen(
+          card: card,
+          onShown: () => widget.repository.markUsed(card.id),
+        ),
+      ),
     );
   }
 
@@ -1632,9 +1635,7 @@ class _HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
             PopupMenuItem(
               value: _HomeMenuAction.lock,
               child: _PopupMenuItemRow(
-                icon: lockEnabled
-                    ? Icons.lock_outline
-                    : Icons.shield_outlined,
+                icon: lockEnabled ? Icons.lock_outline : Icons.shield_outlined,
                 label: 'App lock',
               ),
             ),
@@ -1694,9 +1695,8 @@ class _CategoryFilterBar extends StatelessWidget {
               ),
             ],
             selected: {browseMode},
-            onSelectionChanged: (selection) => onBrowseModeChanged(
-              selection.first,
-            ),
+            onSelectionChanged: (selection) =>
+                onBrowseModeChanged(selection.first),
           ),
         ),
         const SizedBox(height: 16),
@@ -1724,8 +1724,7 @@ class _CategoryFilterBar extends StatelessWidget {
                         size: CardBoxThemeTokens.of(context).iconSmall,
                       ),
                       SizedBox(
-                        width:
-                            CardBoxThemeTokens.of(context).spaceMedium - 2,
+                        width: CardBoxThemeTokens.of(context).spaceMedium - 2,
                       ),
                       Expanded(
                         child: Column(
@@ -1737,19 +1736,16 @@ class _CategoryFilterBar extends StatelessWidget {
                               style: Theme.of(context).textTheme.labelSmall,
                             ),
                             SizedBox(
-                              height: CardBoxThemeTokens.of(context).spaceXSmall /
+                              height:
+                                  CardBoxThemeTokens.of(context).spaceXSmall /
                                   2,
                             ),
                             Text(
                               selectedCategoryLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -1816,15 +1812,12 @@ class _CardActionsSheet extends StatelessWidget {
             children: [
               Text(
                 'More options',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
-              Text(
-                card.name,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text(card.name, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
                 card.issuer.isEmpty ? card.categoryLabel : card.issuer,

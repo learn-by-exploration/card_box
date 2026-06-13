@@ -360,42 +360,44 @@ void main() {
     expect(vcard, contains('END:VCARD'));
   });
 
-  test('CardStorageCodec decodeBackup skips a corrupt card and returns the rest',
-      () {
-    // Build an envelope where the cards list contains one
-    // well-formed card, one that is not a Map, and one whose
-    // id field has the wrong type — `json['id'] as String?` will
-    // throw a TypeError on this input, which is exactly the
-    // failure mode a hand-edited backup would produce.
-    final envelope = jsonEncode({
-      'format': 'card_box_plain_json',
-      'schemaVersion': 5,
-      'exportedAt': '2026-06-04T00:00:00.000Z',
-      'cards': [
-        {
-          'id': 'valid',
-          'name': 'Valid card',
-          'category': 'contact',
-          'createdAt': '2026-06-04T00:00:00.000Z',
-          'updatedAt': '2026-06-04T00:00:00.000Z',
-        },
-        'not-a-map',
-        {
-          'id': 42, // wrong type — will fail `as String?`
-          'name': 'Migrate-broken card',
-          'category': 'contact',
-          'createdAt': '2026-06-04T00:00:00.000Z',
-          'updatedAt': '2026-06-04T00:00:00.000Z',
-        },
-      ],
-    });
+  test(
+    'CardStorageCodec decodeBackup skips a corrupt card and returns the rest',
+    () {
+      // Build an envelope where the cards list contains one
+      // well-formed card, one that is not a Map, and one whose
+      // id field has the wrong type — `json['id'] as String?` will
+      // throw a TypeError on this input, which is exactly the
+      // failure mode a hand-edited backup would produce.
+      final envelope = jsonEncode({
+        'format': 'card_box_plain_json',
+        'schemaVersion': 5,
+        'exportedAt': '2026-06-04T00:00:00.000Z',
+        'cards': [
+          {
+            'id': 'valid',
+            'name': 'Valid card',
+            'category': 'contact',
+            'createdAt': '2026-06-04T00:00:00.000Z',
+            'updatedAt': '2026-06-04T00:00:00.000Z',
+          },
+          'not-a-map',
+          {
+            'id': 42, // wrong type — will fail `as String?`
+            'name': 'Migrate-broken card',
+            'category': 'contact',
+            'createdAt': '2026-06-04T00:00:00.000Z',
+            'updatedAt': '2026-06-04T00:00:00.000Z',
+          },
+        ],
+      });
 
-    final result = CardStorageCodec().decodeBackup(envelope);
+      final result = CardStorageCodec().decodeBackup(envelope);
 
-    // The valid card survives; the broken one and the non-map
-    // entry are both dropped.
-    expect(result.cards.map((card) => card.id), ['valid']);
-  });
+      // The valid card survives; the broken one and the non-map
+      // entry are both dropped.
+      expect(result.cards.map((card) => card.id), ['valid']);
+    },
+  );
 
   test('ContactActionService builds launchable URIs', () {
     const service = ContactActionService();
@@ -510,26 +512,23 @@ void main() {
     );
   });
 
-  test(
-    'BackupCryptoService rejects a password whose trimmed length is < 8 '
-    'even if the raw string is long enough',
-    () async {
-      const rawJson = '{"format":"card_box_plain_json","cards":[]}';
-      final crypto = BackupCryptoService();
-      // Seven non-whitespace characters padded with eight spaces.
-      // The raw length is 15, but the trimmed length is 7 — a
-      // legitimate weak password that the previous check passed
-      // (it validated the trimmed length) and that would have
-      // produced a key with only 7 characters of entropy.
-      expect(
-        () => crypto.encryptJson(
-          rawJson: rawJson,
-          password: 'abc1234' * 1 + '        ', // 7 + 8 spaces = 15
-        ),
-        throwsFormatException,
-      );
-    },
-  );
+  test('BackupCryptoService rejects a password whose trimmed length is < 8 '
+      'even if the raw string is long enough', () async {
+    const rawJson = '{"format":"card_box_plain_json","cards":[]}';
+    final crypto = BackupCryptoService();
+    // Seven non-whitespace characters padded with eight spaces.
+    // The raw length is 15, but the trimmed length is 7 — a
+    // legitimate weak password that the previous check passed
+    // (it validated the trimmed length) and that would have
+    // produced a key with only 7 characters of entropy.
+    expect(
+      () => crypto.encryptJson(
+        rawJson: rawJson,
+        password: 'abc1234' * 1 + '        ', // 7 + 8 spaces = 15
+      ),
+      throwsFormatException,
+    );
+  });
 
   test('AppLockService defers locking during trusted external flows', () async {
     SharedPreferences.setMockInitialValues({});

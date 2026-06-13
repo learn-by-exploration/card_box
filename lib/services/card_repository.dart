@@ -239,10 +239,7 @@ class CardRepository extends ChangeNotifier {
     );
   }
 
-  Future<void> upsert(
-    WalletCard card, {
-    DateTime? updatedAt,
-  }) {
+  Future<void> upsert(WalletCard card, {DateTime? updatedAt}) {
     return _enqueue(() => _upsertImpl(card, updatedAt: updatedAt));
   }
 
@@ -250,17 +247,12 @@ class CardRepository extends ChangeNotifier {
   /// internal methods (`archive`, `import`, `migrateCustomCategory`)
   /// that already hold the queue. Must NOT be wrapped in `_enqueue`
   /// at the call site — doing so would deadlock.
-  Future<void> _upsertImpl(
-    WalletCard card, {
-    DateTime? updatedAt,
-  }) async {
+  Future<void> _upsertImpl(WalletCard card, {DateTime? updatedAt}) async {
     final index = _cards.indexWhere((existing) => existing.id == card.id);
     if (index == -1) {
       // Fresh insert: trust the caller's updatedAt (preserved by import)
       // unless an explicit override is provided.
-      final stamped = card.copyWith(
-        updatedAt: updatedAt ?? card.updatedAt,
-      );
+      final stamped = card.copyWith(updatedAt: updatedAt ?? card.updatedAt);
       // DB write first; on failure, in-memory state is unchanged.
       await _database.upsertCard(stamped);
       _cards.add(stamped);
@@ -272,9 +264,7 @@ class CardRepository extends ChangeNotifier {
         // must not appear to have changed the card.
         return;
       }
-      final stamped = card.copyWith(
-        updatedAt: updatedAt ?? DateTime.now(),
-      );
+      final stamped = card.copyWith(updatedAt: updatedAt ?? DateTime.now());
       // DB write first; only mutate in-memory and clean up old
       // images after a successful write. This avoids leaving the
       // on-disk image orphaned by a stale DB row on partial failure.
@@ -458,7 +448,9 @@ class CardRepository extends ChangeNotifier {
         }
         final updated = card.copyWith(
           category: toCategory,
-          customCategory: toCategory == CardCategory.other ? targetCustom : null,
+          customCategory: toCategory == CardCategory.other
+              ? targetCustom
+              : null,
           clearCustomCategory: toCategory != CardCategory.other,
           updatedAt: now,
         );
@@ -493,9 +485,7 @@ class CardRepository extends ChangeNotifier {
         if (frontImage != null) {
           images.add(frontImage);
         } else if (card.frontImagePath.trim().isNotEmpty) {
-          missing.add(
-            MissingCardImage(cardId: card.id, side: 'front'),
-          );
+          missing.add(MissingCardImage(cardId: card.id, side: 'front'));
         }
         final backImage = await _imageAttachmentFor(
           path: card.backImagePath,
@@ -505,9 +495,7 @@ class CardRepository extends ChangeNotifier {
         if (backImage != null) {
           images.add(backImage);
         } else if (card.backImagePath.trim().isNotEmpty) {
-          missing.add(
-            MissingCardImage(cardId: card.id, side: 'back'),
-          );
+          missing.add(MissingCardImage(cardId: card.id, side: 'back'));
         }
         final barcodeImage = await _imageAttachmentFor(
           path: card.barcodeImagePath,
@@ -517,9 +505,7 @@ class CardRepository extends ChangeNotifier {
         if (barcodeImage != null) {
           images.add(barcodeImage);
         } else if (card.barcodeImagePath.trim().isNotEmpty) {
-          missing.add(
-            MissingCardImage(cardId: card.id, side: 'barcode'),
-          );
+          missing.add(MissingCardImage(cardId: card.id, side: 'barcode'));
         }
       }
       final rawJson = _storageCodec.encodeBackupWithImages(
@@ -544,7 +530,10 @@ class CardRepository extends ChangeNotifier {
       var skippedOlderCount = 0;
       for (final card in payload.cards) {
         importedCards.add(
-          await _hydrateImportedCard(card, attachments: payload.imageAttachments),
+          await _hydrateImportedCard(
+            card,
+            attachments: payload.imageAttachments,
+          ),
         );
       }
       // Track the cards that actually changed during the import so the

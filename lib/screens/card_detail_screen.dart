@@ -251,7 +251,12 @@ class _ActionHeader extends StatelessWidget {
           icon: Icons.fullscreen,
           label: 'Present code',
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card, onShown: () => repository.markUsed(card.id))),
+            MaterialPageRoute(
+              builder: (_) => BarcodePresentScreen(
+                card: card,
+                onShown: () => repository.markUsed(card.id),
+              ),
+            ),
           ),
         ),
       if (!card.hasBarcode && card.hasPhotos)
@@ -260,7 +265,10 @@ class _ActionHeader extends StatelessWidget {
           label: 'Show card',
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => CardReferencePresentScreen(card: card, onShown: () => repository.markUsed(card.id)),
+              builder: (_) => CardReferencePresentScreen(
+                card: card,
+                onShown: () => repository.markUsed(card.id),
+              ),
             ),
           ),
         ),

@@ -30,10 +30,7 @@ enum CardBoxSort {
 /// Pure sort: returns a new list sorted according to [sort]. The
 /// caller is responsible for filtering; this function does not look at
 /// favorites or browse mode — it only orders.
-List<WalletCard> applyCardSort(
-  List<WalletCard> cards,
-  CardBoxSort sort,
-) {
+List<WalletCard> applyCardSort(List<WalletCard> cards, CardBoxSort sort) {
   final copy = List<WalletCard>.of(cards);
   switch (sort) {
     case CardBoxSort.nameAtoZ:

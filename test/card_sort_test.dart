@@ -28,8 +28,12 @@ void main() {
     final cards = <WalletCard>[
       _card(id: 'a', name: 'Banana', hasBarcode: true),
       _card(id: 'b', name: 'apple', updatedAt: DateTime(2024, 2, 1)),
-      _card(id: 'c', name: 'Cherry', favorite: true,
-          createdAt: DateTime(2024, 3, 1)),
+      _card(
+        id: 'c',
+        name: 'Cherry',
+        favorite: true,
+        createdAt: DateTime(2024, 3, 1),
+      ),
     ];
 
     test('nameAtoZ sorts case-insensitively', () {
@@ -44,14 +48,12 @@ void main() {
 
     test('recentlyUpdated puts most-recently-updated first', () {
       final sorted = applyCardSort(cards, CardBoxSort.recentlyUpdated);
-      expect(sorted.first.id, 'b',
-          reason: 'card b has the latest updatedAt');
+      expect(sorted.first.id, 'b', reason: 'card b has the latest updatedAt');
     });
 
     test('recentlyAdded puts most-recently-created first', () {
       final sorted = applyCardSort(cards, CardBoxSort.recentlyAdded);
-      expect(sorted.first.id, 'c',
-          reason: 'card c has the latest createdAt');
+      expect(sorted.first.id, 'c', reason: 'card c has the latest createdAt');
     });
   });
 }

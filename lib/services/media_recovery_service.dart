@@ -10,10 +10,8 @@ import 'package:card_box/models/recovered_media_draft.dart';
 import 'package:card_box/services/card_media_store.dart' as media_store;
 
 class MediaRecoveryService {
-  MediaRecoveryService({
-    required this._preferences,
-    ImagePicker? imagePicker,
-  }) : _imagePicker = imagePicker ?? ImagePicker();
+  MediaRecoveryService({required this._preferences, ImagePicker? imagePicker})
+    : _imagePicker = imagePicker ?? ImagePicker();
 
   static const _pendingRequestKey = 'card_box.pending_media_request.v1';
   static const _pendingAttemptsKey =
@@ -111,7 +109,9 @@ class MediaRecoveryService {
         // next launch starts clean and the user is not stuck
         // silently without a recovery banner.
         if (kDebugMode) {
-          debugPrint('MediaRecovery: pending payload is not a JSON map, dropping');
+          debugPrint(
+            'MediaRecovery: pending payload is not a JSON map, dropping',
+          );
         }
         unawaited(clearPendingPhotoRequest());
         return null;
@@ -119,7 +119,9 @@ class MediaRecoveryService {
       return _PendingMediaRequest.fromJson(decoded);
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('MediaRecovery: pending payload is corrupt, dropping: $error');
+        debugPrint(
+          'MediaRecovery: pending payload is corrupt, dropping: $error',
+        );
       }
       unawaited(clearPendingPhotoRequest());
       return null;

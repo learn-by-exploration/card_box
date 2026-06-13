@@ -29,15 +29,13 @@ void main() async {
   // new one — otherwise the rename orphans the cards. The service
   // only knows the labels; the repository owns the cards, so it
   // installs the hook here.
-  await categoryService.setCategoryMigrationHook(
-    (from, to) async {
-      await repository.migrateCustomCategory(
-        fromLabel: from,
-        toCategory: CardCategory.other,
-        toCustomCategory: to,
-      );
-    },
-  );
+  await categoryService.setCategoryMigrationHook((from, to) async {
+    await repository.migrateCustomCategory(
+      fromLabel: from,
+      toCategory: CardCategory.other,
+      toCustomCategory: to,
+    );
+  });
   final recoveredMediaDraft = await mediaRecoveryService
       .recoverLostPhotoDraft();
   final appLockService = AppLockService(preferences: preferences);

@@ -22,10 +22,7 @@ import 'package:card_box/services/card_media_service.dart' show cardAspectRatio;
 /// one-time "auto-crop wasn't applied" hint without showing
 /// anything when everything worked.
 class TightenResult {
-  const TightenResult({
-    required this.bytes,
-    required this.reason,
-  });
+  const TightenResult({required this.bytes, required this.reason});
 
   final Uint8List bytes;
   final TightenReason reason;
@@ -75,19 +72,15 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
 
   final TextRecognizerFactory _recognizerFactory;
 
-  static List<TextRecognizer> _defaultRecognizerFactory() =>
-      <TextRecognizer>[
-        TextRecognizer(script: TextRecognitionScript.latin),
-        TextRecognizer(script: TextRecognitionScript.japanese),
-      ];
+  static List<TextRecognizer> _defaultRecognizerFactory() => <TextRecognizer>[
+    TextRecognizer(script: TextRecognitionScript.latin),
+    TextRecognizer(script: TextRecognitionScript.japanese),
+  ];
 
   @override
   Future<TightenResult> tighten(Uint8List jpegBytes) async {
     if (jpegBytes.isEmpty) {
-      return TightenResult(
-        bytes: jpegBytes,
-        reason: TightenReason.noChange,
-      );
+      return TightenResult(bytes: jpegBytes, reason: TightenReason.noChange);
     }
     try {
       final decoded = img.decodeJpg(jpegBytes);
@@ -120,7 +113,9 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
             await tempFile.delete();
           } catch (error) {
             if (kDebugMode) {
-              debugPrint('PhotoTightener: best-effort temp delete failed: $error');
+              debugPrint(
+                'PhotoTightener: best-effort temp delete failed: $error',
+              );
             }
           }
         }
@@ -147,10 +142,7 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
           crop.y == 0 &&
           crop.width == imageWidth &&
           crop.height == imageHeight) {
-        return TightenResult(
-          bytes: jpegBytes,
-          reason: TightenReason.noChange,
-        );
+        return TightenResult(bytes: jpegBytes, reason: TightenReason.noChange);
       }
 
       final cropped = img.copyCrop(
@@ -186,7 +178,9 @@ class DefaultCardPhotoTightener implements CardPhotoTightener {
         } catch (error) {
           // A single recognizer failing should not abort tightening.
           if (kDebugMode) {
-            debugPrint('PhotoTightener: recognizer.processImage failed: $error');
+            debugPrint(
+              'PhotoTightener: recognizer.processImage failed: $error',
+            );
           }
           continue;
         }

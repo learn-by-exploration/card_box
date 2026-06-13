@@ -309,10 +309,7 @@ class _SentinelTightener implements CardPhotoTightener {
   @override
   Future<TightenResult> tighten(Uint8List jpegBytes) async {
     callCount += 1;
-    return TightenResult(
-      bytes: sentinel,
-      reason: TightenReason.tightened,
-    );
+    return TightenResult(bytes: sentinel, reason: TightenReason.tightened);
   }
 }
 
@@ -939,27 +936,26 @@ void main() {
       expect(result, const CardPhotoCrop(x: 0, y: 0, width: 0, height: 0));
     });
 
-    test('returns an ID-1 center crop of the full image when no text found',
-        () {
-      // Image is 1000x1000 (square). ID-1 is 1.586:1, so the result is the
-      // full width with vertical centering.
-      final result = computeCardCrop(
-        imageWidth: 1000,
-        imageHeight: 1000,
-        textBoxes: const <Rect>[],
-      );
-      expect(result.x, 0);
-      expect(result.width, 1000);
-      // Centered vertically: newHeight = 1000 / 1.586 = ~631; dy = ~185
-      expect(result.height, lessThan(1000));
-      expect(result.height, greaterThan(600));
-      expect(result.y, greaterThan(0));
-      // The result must be ID-1 ratio within 1px.
-      expect(
-        result.width / result.height,
-        closeTo(cardAspectRatio, 0.01),
-      );
-    });
+    test(
+      'returns an ID-1 center crop of the full image when no text found',
+      () {
+        // Image is 1000x1000 (square). ID-1 is 1.586:1, so the result is the
+        // full width with vertical centering.
+        final result = computeCardCrop(
+          imageWidth: 1000,
+          imageHeight: 1000,
+          textBoxes: const <Rect>[],
+        );
+        expect(result.x, 0);
+        expect(result.width, 1000);
+        // Centered vertically: newHeight = 1000 / 1.586 = ~631; dy = ~185
+        expect(result.height, lessThan(1000));
+        expect(result.height, greaterThan(600));
+        expect(result.y, greaterThan(0));
+        // The result must be ID-1 ratio within 1px.
+        expect(result.width / result.height, closeTo(cardAspectRatio, 0.01));
+      },
+    );
 
     test('returns an ID-1 center crop when image is wider than card', () {
       // 2000x800 (very wide). Result is a centered card-shaped slice.
@@ -968,10 +964,7 @@ void main() {
         imageHeight: 800,
         textBoxes: const <Rect>[],
       );
-      expect(
-        result.width / result.height,
-        closeTo(cardAspectRatio, 0.01),
-      );
+      expect(result.width / result.height, closeTo(cardAspectRatio, 0.01));
       // The full height is kept, so y == 0 and height == 800.
       expect(result.y, 0);
       expect(result.height, 800);
@@ -988,10 +981,7 @@ void main() {
       // should be ID-1.
       expect(result.x + result.width, lessThanOrEqualTo(1000));
       expect(result.y + result.height, lessThanOrEqualTo(1000));
-      expect(
-        result.width / result.height,
-        closeTo(cardAspectRatio, 0.01),
-      );
+      expect(result.width / result.height, closeTo(cardAspectRatio, 0.01));
     });
 
     test('fits a wider-than-card text region by extending vertically', () {
@@ -1007,10 +997,7 @@ void main() {
       );
       expect(result.width, inInclusiveRange(715, 725));
       expect(result.height, inInclusiveRange(450, 460));
-      expect(
-        result.width / result.height,
-        closeTo(cardAspectRatio, 0.01),
-      );
+      expect(result.width / result.height, closeTo(cardAspectRatio, 0.01));
     });
 
     test('fits a taller-than-card text region by extending horizontally', () {
@@ -1026,10 +1013,7 @@ void main() {
       expect(result.x, 0);
       expect(result.width, 1000);
       expect(result.height, inInclusiveRange(625, 640));
-      expect(
-        result.width / result.height,
-        closeTo(cardAspectRatio, 0.01),
-      );
+      expect(result.width / result.height, closeTo(cardAspectRatio, 0.01));
     });
 
     test('clamps padded region to image bounds near edges', () {
@@ -1063,10 +1047,7 @@ void main() {
       expect(result.x, inInclusiveRange(0, 0));
       expect(result.x + result.width, lessThanOrEqualTo(1000));
       expect(result.y + result.height, lessThanOrEqualTo(1000));
-      expect(
-        result.width / result.height,
-        closeTo(cardAspectRatio, 0.01),
-      );
+      expect(result.width / result.height, closeTo(cardAspectRatio, 0.01));
     });
   });
 
@@ -1078,15 +1059,29 @@ void main() {
       expect(result.reason, TightenReason.noChange);
     });
 
-    test('tighten returns original bytes on garbage (non-JPEG) input', () async {
-      const tightener = DefaultCardPhotoTightener();
-      final garbage = Uint8List.fromList(<int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-      final result = await tightener.tighten(garbage);
-      // image.decodeJpg throws on garbage → caught by the inner
-      // try/catch and reported as an internal error.
-      expect(result.bytes, equals(garbage));
-      expect(result.reason, TightenReason.internalError);
-    });
+    test(
+      'tighten returns original bytes on garbage (non-JPEG) input',
+      () async {
+        const tightener = DefaultCardPhotoTightener();
+        final garbage = Uint8List.fromList(<int>[
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+        ]);
+        final result = await tightener.tighten(garbage);
+        // image.decodeJpg throws on garbage → caught by the inner
+        // try/catch and reported as an internal error.
+        expect(result.bytes, equals(garbage));
+        expect(result.reason, TightenReason.internalError);
+      },
+    );
 
     test(
       'tighten returns original bytes when recognizer throws an exception',
@@ -1157,34 +1152,37 @@ void main() {
       },
     );
 
-    test('scanCardPhoto stores the raw bytes when tightening is a no-op', () async {
-      final tempDir = await Directory.systemTemp.createTemp(
-        'card_box_scan_passthrough',
-      );
-      final scannedFile = File('${tempDir.path}/scanned.jpg')
-        ..writeAsBytesSync(<int>[4, 4, 4]);
-      final store = _FakeMediaStoreDelegate()
-        ..bytesImagePath = '/stored/passthrough.jpg';
-      final scanner = _FakeAndroidDocumentScanner(
-        paths: <String>[scannedFile.path],
-      );
-      final tightener = _SentinelTightener(
-        sentinel: Uint8List.fromList(<int>[4, 4, 4]), // same as input
-      );
-      final service = CardMediaService(
-        mediaStore: store,
-        androidDocumentScanner: scanner,
-        platform: CardMediaPlatform.android,
-        photoTightener: tightener,
-      );
+    test(
+      'scanCardPhoto stores the raw bytes when tightening is a no-op',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'card_box_scan_passthrough',
+        );
+        final scannedFile = File('${tempDir.path}/scanned.jpg')
+          ..writeAsBytesSync(<int>[4, 4, 4]);
+        final store = _FakeMediaStoreDelegate()
+          ..bytesImagePath = '/stored/passthrough.jpg';
+        final scanner = _FakeAndroidDocumentScanner(
+          paths: <String>[scannedFile.path],
+        );
+        final tightener = _SentinelTightener(
+          sentinel: Uint8List.fromList(<int>[4, 4, 4]), // same as input
+        );
+        final service = CardMediaService(
+          mediaStore: store,
+          androidDocumentScanner: scanner,
+          platform: CardMediaPlatform.android,
+          photoTightener: tightener,
+        );
 
-      final result = await service.scanCardPhoto(
-        cardId: 'card-2',
-        side: 'back',
-      );
+        final result = await service.scanCardPhoto(
+          cardId: 'card-2',
+          side: 'back',
+        );
 
-      expect(result?.path, '/stored/passthrough.jpg');
-      expect(store.lastBytes, <int>[4, 4, 4]);
-    });
+        expect(result?.path, '/stored/passthrough.jpg');
+        expect(store.lastBytes, <int>[4, 4, 4]);
+      },
+    );
   });
 }

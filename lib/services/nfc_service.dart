@@ -160,9 +160,7 @@ class NfcService {
                 ),
               );
             }
-            await tearDown(
-              errorMessageIos: 'Unable to read this card.',
-            );
+            await tearDown(errorMessageIos: 'Unable to read this card.');
           }
         },
       );
@@ -179,9 +177,7 @@ class NfcService {
               ),
             );
           }
-          await tearDown(
-            errorMessageIos: 'Timed out waiting for a card.',
-          );
+          await tearDown(errorMessageIos: 'Timed out waiting for a card.');
           // Returning the same instance the completer was given is
           // safe — both code paths produce the same shape and
           // `completer.future` resolves before this returns.

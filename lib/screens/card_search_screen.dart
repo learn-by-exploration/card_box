@@ -251,14 +251,24 @@ class _CardSearchScreenState extends State<CardSearchScreen> {
   }
 
   Future<void> _showCardCode(WalletCard card) async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id))));
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BarcodePresentScreen(
+          card: card,
+          onShown: () => widget.repository.markUsed(card.id),
+        ),
+      ),
+    );
   }
 
   Future<void> _showCardImages(WalletCard card) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => CardReferencePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id))),
+      MaterialPageRoute(
+        builder: (_) => CardReferencePresentScreen(
+          card: card,
+          onShown: () => widget.repository.markUsed(card.id),
+        ),
+      ),
     );
   }
 }

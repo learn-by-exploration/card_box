@@ -114,7 +114,11 @@ class CardStorageCodec {
       final item = rawMaps[index];
       try {
         var cardMap = Map<String, Object?>.from(item);
-        for (var version = fromVersion; version < currentSchemaVersion; version++) {
+        for (
+          var version = fromVersion;
+          version < currentSchemaVersion;
+          version++
+        ) {
           cardMap = switch (version) {
             1 => _migrateCardV1toV2(cardMap),
             2 => _migrateCardV2toV3(cardMap),
@@ -133,7 +137,9 @@ class CardStorageCodec {
         // row; the rest still need to come through. Log and
         // continue so the caller's loop sees only valid cards.
         // ignore: avoid_print
-        print('CardStorageCodec: skipping corrupt card at index $index: $error');
+        print(
+          'CardStorageCodec: skipping corrupt card at index $index: $error',
+        );
       }
     }
     return decoded;
@@ -297,20 +303,14 @@ class CardStoragePayload {
 /// surface a "N images could not be included" hint instead of
 /// silently dropping the bytes.
 class CardExportSummary {
-  const CardExportSummary({
-    required this.rawJson,
-    required this.missingImages,
-  });
+  const CardExportSummary({required this.rawJson, required this.missingImages});
 
   final String rawJson;
   final List<MissingCardImage> missingImages;
 }
 
 class MissingCardImage {
-  const MissingCardImage({
-    required this.cardId,
-    required this.side,
-  });
+  const MissingCardImage({required this.cardId, required this.side});
 
   final String cardId;
   final String side;

@@ -2,7 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
-import 'package:flutter/services.dart' show MissingPluginException, PlatformException;
+import 'package:flutter/services.dart'
+    show MissingPluginException, PlatformException;
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
@@ -27,35 +28,32 @@ void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
   group('CardRepository', () {
-    test(
-      'upsertCard round-trips a card through payload JSON',
-      () async {
-        final database = createInMemoryDatabase();
-        final card = WalletCard(
-          id: 'db-card',
-          name: 'Aiko Tanaka',
-          issuer: 'CourtSide Japan',
-          category: CardCategory.contact,
-          notes: 'Met after practice',
-          barcodePayload: 'AIKO-42',
-          nfcTagSummary: 'ISO-DEP candidate',
-          createdAt: DateTime(2026, 6, 4),
-          updatedAt: DateTime(2026, 6, 4),
-        );
+    test('upsertCard round-trips a card through payload JSON', () async {
+      final database = createInMemoryDatabase();
+      final card = WalletCard(
+        id: 'db-card',
+        name: 'Aiko Tanaka',
+        issuer: 'CourtSide Japan',
+        category: CardCategory.contact,
+        notes: 'Met after practice',
+        barcodePayload: 'AIKO-42',
+        nfcTagSummary: 'ISO-DEP candidate',
+        createdAt: DateTime(2026, 6, 4),
+        updatedAt: DateTime(2026, 6, 4),
+      );
 
-        await database.upsertCard(card);
-        final cards = await database.loadCards();
-        expect(cards, hasLength(1));
-        final loaded = cards.single;
-        expect(loaded.id, card.id);
-        expect(loaded.name, card.name);
-        expect(loaded.issuer, card.issuer);
-        expect(loaded.category, card.category);
-        expect(loaded.barcodePayload, card.barcodePayload);
-        expect(loaded.nfcTagSummary, card.nfcTagSummary);
-        await database.close();
-      },
-    );
+      await database.upsertCard(card);
+      final cards = await database.loadCards();
+      expect(cards, hasLength(1));
+      final loaded = cards.single;
+      expect(loaded.id, card.id);
+      expect(loaded.name, card.name);
+      expect(loaded.issuer, card.issuer);
+      expect(loaded.category, card.category);
+      expect(loaded.barcodePayload, card.barcodePayload);
+      expect(loaded.nfcTagSummary, card.nfcTagSummary);
+      await database.close();
+    });
 
     test(
       'loadCards skips rows with corrupt payload JSON and returns the rest',
@@ -91,49 +89,44 @@ void main() {
       },
     );
 
-    test(
-      'v3 schema codec round-trips a card through payload JSON',
-      () async {
-        // The v3 schema is the minimum storage-of-record: only
-        // id, payload_json, created_at_millis, updated_at_millis.
-        // Writing a card and reading it back must return the
-        // same field values, proving the codec and the row
-        // shape are aligned. (The cross-process / device
-        // round-trip is exercised by test/round_trip_test.dart.)
-        //
-        // The v1->v2 per-row backfill and the v2->v3 drop path
-        // use the same per-row try/catch isolation as
-        // loadCards, which is exercised by the "loadCards skips
-        // rows with corrupt payload JSON" test earlier in this
-        // group. Restoring a direct migration test would
-        // require either a @visibleForTesting escape hatch on
-        // `_backfillNormalizedColumns` or a v1-subclass harness;
-        // both are deferred to a follow-up pass.
-        final database = createInMemoryDatabase();
-        final original = WalletCard(
-          id: 'round-trip',
-          name: 'Round-trip card',
-          category: CardCategory.access,
-          createdAt: DateTime(2026, 6, 4),
-          updatedAt: DateTime(2026, 6, 4, 0, 0, 5),
-        );
-        await database.upsertCard(original);
-        final loaded = await database.loadCards();
-        expect(loaded, hasLength(1));
-        expect(loaded.single.id, original.id);
-        expect(loaded.single.name, original.name);
-        expect(loaded.single.updatedAt, original.updatedAt);
-        await database.close();
-      },
-    );
+    test('v3 schema codec round-trips a card through payload JSON', () async {
+      // The v3 schema is the minimum storage-of-record: only
+      // id, payload_json, created_at_millis, updated_at_millis.
+      // Writing a card and reading it back must return the
+      // same field values, proving the codec and the row
+      // shape are aligned. (The cross-process / device
+      // round-trip is exercised by test/round_trip_test.dart.)
+      //
+      // The v1->v2 per-row backfill and the v2->v3 drop path
+      // use the same per-row try/catch isolation as
+      // loadCards, which is exercised by the "loadCards skips
+      // rows with corrupt payload JSON" test earlier in this
+      // group. Restoring a direct migration test would
+      // require either a @visibleForTesting escape hatch on
+      // `_backfillNormalizedColumns` or a v1-subclass harness;
+      // both are deferred to a follow-up pass.
+      final database = createInMemoryDatabase();
+      final original = WalletCard(
+        id: 'round-trip',
+        name: 'Round-trip card',
+        category: CardCategory.access,
+        createdAt: DateTime(2026, 6, 4),
+        updatedAt: DateTime(2026, 6, 4, 0, 0, 5),
+      );
+      await database.upsertCard(original);
+      final loaded = await database.loadCards();
+      expect(loaded, hasLength(1));
+      expect(loaded.single.id, original.id);
+      expect(loaded.single.name, original.name);
+      expect(loaded.single.updatedAt, original.updatedAt);
+      await database.close();
+    });
 
     test(
       'sort cache returns the same instance until notifyListeners fires',
       () async {
         SharedPreferences.setMockInitialValues({});
-        final repository = CardRepository(
-          database: createInMemoryDatabase(),
-        );
+        final repository = CardRepository(database: createInMemoryDatabase());
         await repository.init();
         await repository.upsert(
           WalletCard(
@@ -257,45 +250,74 @@ void main() {
             updatedAt: baseTimestamp,
           ),
         );
-        expect(database.upsertedIds.length, firstUpsertCount,
-            reason: 'No-op upsert must not hit the database');
+        expect(
+          database.upsertedIds.length,
+          firstUpsertCount,
+          reason: 'No-op upsert must not hit the database',
+        );
         final reloaded = repository.findById('noop-card')!;
-        expect(reloaded.updatedAt, baseTimestamp,
-            reason: 'No-op upsert must not bump updatedAt');
+        expect(
+          reloaded.updatedAt,
+          baseTimestamp,
+          reason: 'No-op upsert must not bump updatedAt',
+        );
       },
     );
 
-    test('duplicateCard returns a copy with a new id and (copy) suffix',
-        () async {
-      SharedPreferences.setMockInitialValues({});
-      final repository = CardRepository(database: createInMemoryDatabase());
-      await repository.init();
-      final original = WalletCard(
-        id: 'orig-1',
-        name: 'Coffee card',
-        issuer: 'Beans Co',
-        category: CardCategory.loyalty,
-        createdAt: DateTime(2024, 1, 1),
-        updatedAt: DateTime(2024, 1, 1),
-        barcodePayload: 'BC-12345',
-      );
-      await repository.upsert(original);
-      final copy = await repository.duplicateCard('orig-1');
-      expect(copy, isNotNull,
-          reason: 'Duplicate must succeed for a known card id');
-      expect(copy!.id, isNot('orig-1'),
-          reason: 'Duplicate must have a new id');
-      expect(copy.name, 'Coffee card (copy)',
-          reason: 'Duplicate must append (copy) to the name');
-      expect(copy.issuer, original.issuer,
-          reason: 'Other fields must be preserved on the copy');
-      expect(copy.barcodePayload, original.barcodePayload,
-          reason: 'Barcode payload must be preserved on the copy');
-      expect(repository.findById('orig-1'), isNotNull,
-          reason: 'Original card must still be present');
-      expect(repository.findById(copy.id), isNotNull,
-          reason: 'New card must be persisted');
-    });
+    test(
+      'duplicateCard returns a copy with a new id and (copy) suffix',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final repository = CardRepository(database: createInMemoryDatabase());
+        await repository.init();
+        final original = WalletCard(
+          id: 'orig-1',
+          name: 'Coffee card',
+          issuer: 'Beans Co',
+          category: CardCategory.loyalty,
+          createdAt: DateTime(2024, 1, 1),
+          updatedAt: DateTime(2024, 1, 1),
+          barcodePayload: 'BC-12345',
+        );
+        await repository.upsert(original);
+        final copy = await repository.duplicateCard('orig-1');
+        expect(
+          copy,
+          isNotNull,
+          reason: 'Duplicate must succeed for a known card id',
+        );
+        expect(
+          copy!.id,
+          isNot('orig-1'),
+          reason: 'Duplicate must have a new id',
+        );
+        expect(
+          copy.name,
+          'Coffee card (copy)',
+          reason: 'Duplicate must append (copy) to the name',
+        );
+        expect(
+          copy.issuer,
+          original.issuer,
+          reason: 'Other fields must be preserved on the copy',
+        );
+        expect(
+          copy.barcodePayload,
+          original.barcodePayload,
+          reason: 'Barcode payload must be preserved on the copy',
+        );
+        expect(
+          repository.findById('orig-1'),
+          isNotNull,
+          reason: 'Original card must still be present',
+        );
+        expect(
+          repository.findById(copy.id),
+          isNotNull,
+          reason: 'New card must be persisted',
+        );
+      },
+    );
 
     test('duplicateCard returns null for an unknown id', () async {
       SharedPreferences.setMockInitialValues({});
@@ -305,36 +327,50 @@ void main() {
       expect(copy, isNull);
     });
 
-    test('duplicateCard resets archived, favorite, and usage telemetry',
-        () async {
-      SharedPreferences.setMockInitialValues({});
-      final repository = CardRepository(database: createInMemoryDatabase());
-      await repository.init();
-      final stamp = DateTime(2024, 1, 1);
-      final original = WalletCard(
-        id: 'orig-archived',
-        name: 'Retired metro card',
-        category: CardCategory.transit,
-        createdAt: stamp,
-        updatedAt: stamp,
-        barcodePayload: 'METRO-9',
-        archived: true,
-        favorite: true,
-        lastUsedAt: stamp,
-        useCount: 7,
-      );
-      await repository.upsert(original);
-      final copy = await repository.duplicateCard('orig-archived');
-      expect(copy, isNotNull);
-      expect(copy!.archived, isFalse,
-          reason: 'Duplicate of an archived card must be active');
-      expect(copy.favorite, isFalse,
-          reason: 'Duplicate of a favorite must not inherit the favorite');
-      expect(copy.lastUsedAt, isNull,
-          reason: 'Duplicate must not inherit the lastUsedAt timestamp');
-      expect(copy.useCount, 0,
-          reason: 'Duplicate must start with a zero use count');
-    });
+    test(
+      'duplicateCard resets archived, favorite, and usage telemetry',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final repository = CardRepository(database: createInMemoryDatabase());
+        await repository.init();
+        final stamp = DateTime(2024, 1, 1);
+        final original = WalletCard(
+          id: 'orig-archived',
+          name: 'Retired metro card',
+          category: CardCategory.transit,
+          createdAt: stamp,
+          updatedAt: stamp,
+          barcodePayload: 'METRO-9',
+          archived: true,
+          favorite: true,
+          lastUsedAt: stamp,
+          useCount: 7,
+        );
+        await repository.upsert(original);
+        final copy = await repository.duplicateCard('orig-archived');
+        expect(copy, isNotNull);
+        expect(
+          copy!.archived,
+          isFalse,
+          reason: 'Duplicate of an archived card must be active',
+        );
+        expect(
+          copy.favorite,
+          isFalse,
+          reason: 'Duplicate of a favorite must not inherit the favorite',
+        );
+        expect(
+          copy.lastUsedAt,
+          isNull,
+          reason: 'Duplicate must not inherit the lastUsedAt timestamp',
+        );
+        expect(
+          copy.useCount,
+          0,
+          reason: 'Duplicate must start with a zero use count',
+        );
+      },
+    );
 
     test('findByBarcodePayload matches case-insensitively', () async {
       SharedPreferences.setMockInitialValues({});
@@ -350,12 +386,21 @@ void main() {
           barcodePayload: 'LIB-12345',
         ),
       );
-      expect(repository.findByBarcodePayload('lib-12345'), isNotNull,
-          reason: 'Lowercase needle should match uppercase payload');
-      expect(repository.findByBarcodePayload('  LIB-12345  '), isNotNull,
-          reason: 'Whitespace should be trimmed');
-      expect(repository.findByBarcodePayload('not-there'), isNull,
-          reason: 'No match for unrelated payload');
+      expect(
+        repository.findByBarcodePayload('lib-12345'),
+        isNotNull,
+        reason: 'Lowercase needle should match uppercase payload',
+      );
+      expect(
+        repository.findByBarcodePayload('  LIB-12345  '),
+        isNotNull,
+        reason: 'Whitespace should be trimmed',
+      );
+      expect(
+        repository.findByBarcodePayload('not-there'),
+        isNull,
+        reason: 'No match for unrelated payload',
+      );
     });
 
     test('findByBarcodePayload ignores archived cards', () async {
@@ -373,8 +418,11 @@ void main() {
           archived: true,
         ),
       );
-      expect(repository.findByBarcodePayload('X-1'), isNull,
-          reason: 'Archived card must not be a duplicate hit');
+      expect(
+        repository.findByBarcodePayload('X-1'),
+        isNull,
+        reason: 'Archived card must not be a duplicate hit',
+      );
     });
 
     test('markUsed stamps lastUsedAt and increments useCount', () async {
@@ -394,13 +442,31 @@ void main() {
       final stamp = DateTime(2024, 5, 5, 12, 0);
       await repository.markUsed('used-1', at: stamp);
       final card = repository.findById('used-1')!;
-      expect(card.useCount, 1, reason: 'useCount should start at 1 after first use');
-      expect(card.lastUsedAt, stamp, reason: 'lastUsedAt should be the supplied stamp');
-      await repository.markUsed('used-1', at: stamp.add(const Duration(days: 1)));
+      expect(
+        card.useCount,
+        1,
+        reason: 'useCount should start at 1 after first use',
+      );
+      expect(
+        card.lastUsedAt,
+        stamp,
+        reason: 'lastUsedAt should be the supplied stamp',
+      );
+      await repository.markUsed(
+        'used-1',
+        at: stamp.add(const Duration(days: 1)),
+      );
       final after = repository.findById('used-1')!;
-      expect(after.useCount, 2, reason: 'useCount should bump on subsequent uses');
-      expect(after.lastUsedAt, stamp.add(const Duration(days: 1)),
-          reason: 'lastUsedAt should advance');
+      expect(
+        after.useCount,
+        2,
+        reason: 'useCount should bump on subsequent uses',
+      );
+      expect(
+        after.lastUsedAt,
+        stamp.add(const Duration(days: 1)),
+        reason: 'lastUsedAt should advance',
+      );
     });
 
     test('markUsed is a no-op for an unknown card id', () async {
@@ -411,8 +477,11 @@ void main() {
       // Should not throw, should not synthesize a new card, and
       // should not change the visible card list.
       await repository.markUsed('does-not-exist');
-      expect(repository.cards, hasLength(before),
-          reason: 'markUsed must not create a card for an unknown id');
+      expect(
+        repository.cards,
+        hasLength(before),
+        reason: 'markUsed must not create a card for an unknown id',
+      );
     });
 
     test(
@@ -462,10 +531,9 @@ void main() {
 
         // Trigger an update that changes the image path.
         await repository.upsert(
-          repository.findById('atomic-card')!.copyWith(
-            name: 'Updated',
-            frontImagePath: '/images/new.jpg',
-          ),
+          repository
+              .findById('atomic-card')!
+              .copyWith(name: 'Updated', frontImagePath: '/images/new.jpg'),
         );
 
         // The old image delete must happen AFTER the DB write — a
@@ -476,10 +544,13 @@ void main() {
           (d) => d.path == '/images/old.jpg',
         );
         expect(dbAt, isNotNull, reason: 'DB upsert was not recorded');
-        expect(dbAt!.isBefore(img.at) || dbAt.isAtSameMomentAs(img.at),
-            isTrue,
-            reason: 'DB upsert must precede image delete. '
-                'dbAt=$dbAt imgAt=${img.at}');
+        expect(
+          dbAt!.isBefore(img.at) || dbAt.isAtSameMomentAs(img.at),
+          isTrue,
+          reason:
+              'DB upsert must precede image delete. '
+              'dbAt=$dbAt imgAt=${img.at}',
+        );
         expect(repository.findById('atomic-card')!.name, 'Updated');
         expect(
           repository.findById('atomic-card')!.frontImagePath,
@@ -488,53 +559,46 @@ void main() {
       },
     );
 
-    test(
-      'upsert rolls back in-memory state when the DB write fails',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        final mediaManager = FakeCardMediaManager();
-        final database = UpsertThrowingCardDatabase(
-          throwForId: 'rollback-card',
-        );
-        final repository = CardRepository(
-          database: database,
-          mediaManager: mediaManager,
-        );
-        // Seed the card directly via SQL so the throwing path is not
-        // triggered for the initial insert, then load it into memory.
-        final millis = DateTime(2026, 6, 4).millisecondsSinceEpoch;
-        await database.customStatement(
-          'INSERT INTO card_records (id, payload_json, created_at_millis, '
-          'updated_at_millis) VALUES (?, ?, ?, ?)',
-          [
-            'rollback-card',
-            '{"id":"rollback-card","name":"Original","category":"id",'
-                '"frontImagePath":"/images/keep.jpg",'
-                '"createdAt":"2026-06-04T00:00:00.000",'
-                '"updatedAt":"2026-06-04T00:00:00.000"}',
-            millis,
-            millis,
-          ],
-        );
-        await repository.init();
-        expect(repository.findById('rollback-card')!.name, 'Original');
+    test('upsert rolls back in-memory state when the DB write fails', () async {
+      SharedPreferences.setMockInitialValues({});
+      final mediaManager = FakeCardMediaManager();
+      final database = UpsertThrowingCardDatabase(throwForId: 'rollback-card');
+      final repository = CardRepository(
+        database: database,
+        mediaManager: mediaManager,
+      );
+      // Seed the card directly via SQL so the throwing path is not
+      // triggered for the initial insert, then load it into memory.
+      final millis = DateTime(2026, 6, 4).millisecondsSinceEpoch;
+      await database.customStatement(
+        'INSERT INTO card_records (id, payload_json, created_at_millis, '
+        'updated_at_millis) VALUES (?, ?, ?, ?)',
+        [
+          'rollback-card',
+          '{"id":"rollback-card","name":"Original","category":"id",'
+              '"frontImagePath":"/images/keep.jpg",'
+              '"createdAt":"2026-06-04T00:00:00.000",'
+              '"updatedAt":"2026-06-04T00:00:00.000"}',
+          millis,
+          millis,
+        ],
+      );
+      await repository.init();
+      expect(repository.findById('rollback-card')!.name, 'Original');
 
-        await expectLater(
-          repository.upsert(
-            repository
-                .findById('rollback-card')!
-                .copyWith(name: 'Updated'),
-          ),
-          throwsA(isA<StateError>()),
-        );
+      await expectLater(
+        repository.upsert(
+          repository.findById('rollback-card')!.copyWith(name: 'Updated'),
+        ),
+        throwsA(isA<StateError>()),
+      );
 
-        // In-memory state must reflect the original — the failed
-        // write must not have leaked into the cache.
-        expect(repository.findById('rollback-card')!.name, 'Original');
-        // No image cleanup should have happened.
-        expect(mediaManager.deletedPaths, isEmpty);
-      },
-    );
+      // In-memory state must reflect the original — the failed
+      // write must not have leaked into the cache.
+      expect(repository.findById('rollback-card')!.name, 'Original');
+      // No image cleanup should have happened.
+      expect(mediaManager.deletedPaths, isEmpty);
+    });
 
     test(
       'concurrent upserts for the same card serialize through the queue',
@@ -578,16 +642,24 @@ void main() {
         // The queue must have prevented any overlap — the simulated
         // I/O latency (10ms) gives concurrent calls plenty of time to
         // overlap, so maxInFlight > 1 would indicate a missing queue.
-        expect(database.maxInFlight, 1,
-            reason: 'concurrent upserts must serialize through the queue');
+        expect(
+          database.maxInFlight,
+          1,
+          reason: 'concurrent upserts must serialize through the queue',
+        );
         // The two writes must have non-overlapping time ranges.
         final w = database.writes;
-        final firstBeforeSecond = w[0].ended.isBefore(w[1].started) ||
+        final firstBeforeSecond =
+            w[0].ended.isBefore(w[1].started) ||
             w[0].ended.isAtSameMomentAs(w[1].started);
-        final secondBeforeFirst = w[1].ended.isBefore(w[0].started) ||
+        final secondBeforeFirst =
+            w[1].ended.isBefore(w[0].started) ||
             w[1].ended.isAtSameMomentAs(w[0].started);
-        expect(firstBeforeSecond || secondBeforeFirst, isTrue,
-            reason: 'writes must not overlap: ${w[0]} vs ${w[1]}');
+        expect(
+          firstBeforeSecond || secondBeforeFirst,
+          isTrue,
+          reason: 'writes must not overlap: ${w[0]} vs ${w[1]}',
+        );
         // The final in-memory state must be one of the two valid
         // writes (A or B), not a torn or partial value.
         final name = repository.findById('race')!.name;
@@ -664,44 +736,43 @@ void main() {
       expect(repository.findById('card-2'), isNull);
     });
 
-    test(
-      'deleteCard removes the database row before deleting images',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        final mediaManager = RecordingCardMediaManager();
-        final database = RecordingDeleteCardDatabase();
-        final repository = CardRepository(
-          database: database,
-          mediaManager: mediaManager,
-        );
-        await repository.init();
-        await repository.upsert(
-          WalletCard(
-            id: 'card-order',
-            name: 'Order test',
-            category: CardCategory.id,
-            frontImagePath: '/images/order.jpg',
-            createdAt: DateTime(2026, 6, 4),
-            updatedAt: DateTime(2026, 6, 4),
-          ),
-        );
+    test('deleteCard removes the database row before deleting images', () async {
+      SharedPreferences.setMockInitialValues({});
+      final mediaManager = RecordingCardMediaManager();
+      final database = RecordingDeleteCardDatabase();
+      final repository = CardRepository(
+        database: database,
+        mediaManager: mediaManager,
+      );
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'card-order',
+          name: 'Order test',
+          category: CardCategory.id,
+          frontImagePath: '/images/order.jpg',
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
 
-        await repository.deleteCard('card-order');
+      await repository.deleteCard('card-order');
 
-        // DB-first ordering means a partial failure cannot leave the
-        // on-disk image orphaned by a still-existing DB row.
-        final dbAt = database.lastDeleteAt;
-        final img = mediaManager.deletes.firstWhere(
-          (d) => d.path == '/images/order.jpg',
-        );
-        expect(dbAt, isNotNull, reason: 'DB delete was not recorded');
-        expect(dbAt!.isBefore(img.at) || dbAt.isAtSameMomentAs(img.at),
-            isTrue,
-            reason:
-                'DB delete must happen at or before image delete. dbAt=$dbAt imgAt=${img.at}');
-        expect(repository.findById('card-order'), isNull);
-      },
-    );
+      // DB-first ordering means a partial failure cannot leave the
+      // on-disk image orphaned by a still-existing DB row.
+      final dbAt = database.lastDeleteAt;
+      final img = mediaManager.deletes.firstWhere(
+        (d) => d.path == '/images/order.jpg',
+      );
+      expect(dbAt, isNotNull, reason: 'DB delete was not recorded');
+      expect(
+        dbAt!.isBefore(img.at) || dbAt.isAtSameMomentAs(img.at),
+        isTrue,
+        reason:
+            'DB delete must happen at or before image delete. dbAt=$dbAt imgAt=${img.at}',
+      );
+      expect(repository.findById('card-order'), isNull);
+    });
 
     test(
       'deleteCard rolls back in-memory state when the database write fails',
@@ -896,10 +967,7 @@ void main() {
         expect(result.skippedOlderCount, 1);
         // The local card keeps its newer updatedAt — the import did
         // not clobber it.
-        expect(
-          repository.findById('newer-local')!.updatedAt,
-          localTimestamp,
-        );
+        expect(repository.findById('newer-local')!.updatedAt, localTimestamp);
         expect(repository.findById('newer-local')!.name, 'Newer local');
       },
     );
@@ -991,49 +1059,49 @@ void main() {
       );
     });
 
-    test(
-      'exportPlainJson reports missing images in the summary',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        final mediaManager = FakeCardMediaManager();
-        // Seed a single image so the export has something to drop.
-        mediaManager.seedImage(
-          '/present.jpg',
-          StoredImageBackupData(bytes: Uint8List.fromList([1, 2, 3]), extension: '.jpg'),
-        );
-        final repository = CardRepository(
-          database: createInMemoryDatabase(),
-          mediaManager: mediaManager,
-        );
-        await repository.init();
-        await repository.upsert(
-          WalletCard(
-            id: 'card-with-missing',
-            name: 'Has two missing + one present image',
-            category: CardCategory.id,
-            frontImagePath: '/present.jpg',
-            backImagePath: '/gone-back.jpg', // not seeded
-            barcodeImagePath: '/gone-barcode.jpg', // not seeded
-            createdAt: DateTime(2026, 6, 4),
-            updatedAt: DateTime(2026, 6, 4),
-          ),
-        );
+    test('exportPlainJson reports missing images in the summary', () async {
+      SharedPreferences.setMockInitialValues({});
+      final mediaManager = FakeCardMediaManager();
+      // Seed a single image so the export has something to drop.
+      mediaManager.seedImage(
+        '/present.jpg',
+        StoredImageBackupData(
+          bytes: Uint8List.fromList([1, 2, 3]),
+          extension: '.jpg',
+        ),
+      );
+      final repository = CardRepository(
+        database: createInMemoryDatabase(),
+        mediaManager: mediaManager,
+      );
+      await repository.init();
+      await repository.upsert(
+        WalletCard(
+          id: 'card-with-missing',
+          name: 'Has two missing + one present image',
+          category: CardCategory.id,
+          frontImagePath: '/present.jpg',
+          backImagePath: '/gone-back.jpg', // not seeded
+          barcodeImagePath: '/gone-barcode.jpg', // not seeded
+          createdAt: DateTime(2026, 6, 4),
+          updatedAt: DateTime(2026, 6, 4),
+        ),
+      );
 
-        final summary = await repository.exportPlainJson();
+      final summary = await repository.exportPlainJson();
 
-        // The present image is in the payload; the two missing
-        // images are NOT silently dropped — they are reported back
-        // in the summary so the UI can warn the user.
-        expect(summary.missingImages.length, 2);
-        final missingSides = summary.missingImages
-            .where((m) => m.cardId == 'card-with-missing')
-            .map((m) => m.side)
-            .toSet();
-        expect(missingSides, {'back', 'barcode'});
-        // The payload still encodes the present image.
-        expect(summary.rawJson, contains('present'));
-      },
-    );
+      // The present image is in the payload; the two missing
+      // images are NOT silently dropped — they are reported back
+      // in the summary so the UI can warn the user.
+      expect(summary.missingImages.length, 2);
+      final missingSides = summary.missingImages
+          .where((m) => m.cardId == 'card-with-missing')
+          .map((m) => m.side)
+          .toSet();
+      expect(missingSides, {'back', 'barcode'});
+      // The payload still encodes the present image.
+      expect(summary.rawJson, contains('present'));
+    });
 
     test('migrates custom-category cards into a built-in category', () async {
       SharedPreferences.setMockInitialValues({});
@@ -1169,10 +1237,7 @@ void main() {
       await repository.init();
 
       expect(repository.findById('legacy-1'), isNotNull);
-      expect(
-        repository.findById('legacy-1')!.name,
-        'Legacy loyalty',
-      );
+      expect(repository.findById('legacy-1')!.name, 'Legacy loyalty');
       expect(prefs.getString('card_box.cards.v1'), isNull);
     });
   });
@@ -1357,66 +1422,60 @@ void main() {
       },
     );
 
-    test(
-      'falls back to application documents when getDownloadsPath throws '
-      'PlatformException',
-      () async {
-        final tempDir = await createTempDir('platform_exception_backup');
-        addTearDown(() => tempDir.delete(recursive: true));
-        // iOS can throw a PlatformException when the Files app is
-        // unavailable or scoped storage has been revoked. The backup
-        // service must still produce a valid file by falling back
-        // to the app documents directory.
-        PathProviderPlatform.instance = FakePathProviderPlatform(
-          downloadsPathError: PlatformException(
-            code: 'unavailable',
-            message: 'No downloads directory on this device.',
-          ),
-          applicationDocumentsPath: tempDir.path,
-        );
+    test('falls back to application documents when getDownloadsPath throws '
+        'PlatformException', () async {
+      final tempDir = await createTempDir('platform_exception_backup');
+      addTearDown(() => tempDir.delete(recursive: true));
+      // iOS can throw a PlatformException when the Files app is
+      // unavailable or scoped storage has been revoked. The backup
+      // service must still produce a valid file by falling back
+      // to the app documents directory.
+      PathProviderPlatform.instance = FakePathProviderPlatform(
+        downloadsPathError: PlatformException(
+          code: 'unavailable',
+          message: 'No downloads directory on this device.',
+        ),
+        applicationDocumentsPath: tempDir.path,
+      );
 
-        final service = const BackupFileService();
-        final file = await service.createTextFile(
-          content: 'platform-fallback',
-          fileNamePrefix: 'card_box_test',
-          extension: 'txt',
-        );
+      final service = const BackupFileService();
+      final file = await service.createTextFile(
+        content: 'platform-fallback',
+        fileNamePrefix: 'card_box_test',
+        extension: 'txt',
+      );
 
-        expect(file, isNotNull);
-        expect(file!.path, contains('${tempDir.path}/backups/'));
-        expect(File(file.path).readAsStringSync(), 'platform-fallback');
-      },
-    );
+      expect(file, isNotNull);
+      expect(file!.path, contains('${tempDir.path}/backups/'));
+      expect(File(file.path).readAsStringSync(), 'platform-fallback');
+    });
 
-    test(
-      'falls back to application documents when getDownloadsPath throws '
-      'MissingPluginException',
-      () async {
-        final tempDir = await createTempDir('missing_plugin_backup');
-        addTearDown(() => tempDir.delete(recursive: true));
-        // In a stripped-down Flutter embedder or unit test that
-        // forgets to register the path_provider plugin, the channel
-        // returns a MissingPluginException. The backup service must
-        // still fall back to the app documents directory.
-        PathProviderPlatform.instance = FakePathProviderPlatform(
-          downloadsPathError: MissingPluginException(
-            'No implementation found for method getDownloadsPath',
-          ),
-          applicationDocumentsPath: tempDir.path,
-        );
+    test('falls back to application documents when getDownloadsPath throws '
+        'MissingPluginException', () async {
+      final tempDir = await createTempDir('missing_plugin_backup');
+      addTearDown(() => tempDir.delete(recursive: true));
+      // In a stripped-down Flutter embedder or unit test that
+      // forgets to register the path_provider plugin, the channel
+      // returns a MissingPluginException. The backup service must
+      // still fall back to the app documents directory.
+      PathProviderPlatform.instance = FakePathProviderPlatform(
+        downloadsPathError: MissingPluginException(
+          'No implementation found for method getDownloadsPath',
+        ),
+        applicationDocumentsPath: tempDir.path,
+      );
 
-        final service = const BackupFileService();
-        final file = await service.createTextFile(
-          content: 'pluginless',
-          fileNamePrefix: 'card_box_test',
-          extension: 'txt',
-        );
+      final service = const BackupFileService();
+      final file = await service.createTextFile(
+        content: 'pluginless',
+        fileNamePrefix: 'card_box_test',
+        extension: 'txt',
+      );
 
-        expect(file, isNotNull);
-        expect(file!.path, contains('${tempDir.path}/backups/'));
-        expect(File(file.path).readAsStringSync(), 'pluginless');
-      },
-    );
+      expect(file, isNotNull);
+      expect(file!.path, contains('${tempDir.path}/backups/'));
+      expect(File(file.path).readAsStringSync(), 'pluginless');
+    });
 
     test('imports a selected backup file through the file selector', () async {
       final tempDir = await createTempDir('pick_backup');
@@ -1563,10 +1622,7 @@ void main() {
         expect(recovered, isNull);
         // The corrupt key must have been dropped so we do not retry
         // an unrecoverable payload on every subsequent launch.
-        expect(
-          prefs.getString('card_box.pending_media_request.v1'),
-          isNull,
-        );
+        expect(prefs.getString('card_box.pending_media_request.v1'), isNull);
         expect(
           prefs.getInt('card_box.pending_media_request.attempts.v1'),
           isNull,
@@ -1619,46 +1675,40 @@ void main() {
       expect(await secureStore.containsKey(AppLockService.pinKey), isFalse);
     });
 
-    test(
-      'trusted external flow auto-expires after the 60s max-age',
-      () async {
-        var now = DateTime(2026, 6, 1, 12, 0, 0);
-        DateTime clock() => now;
-        final service = await createReadyAppLockService(clock: clock);
+    test('trusted external flow auto-expires after the 60s max-age', () async {
+      var now = DateTime(2026, 6, 1, 12, 0, 0);
+      DateTime clock() => now;
+      final service = await createReadyAppLockService(clock: clock);
 
-        service.beginTrustedExternalFlow();
-        expect(service.deferringBackgroundLock, isTrue);
+      service.beginTrustedExternalFlow();
+      expect(service.deferringBackgroundLock, isTrue);
 
-        // Step forward 59s — still inside the window.
-        now = now.add(const Duration(seconds: 59));
-        expect(service.deferringBackgroundLock, isTrue);
+      // Step forward 59s — still inside the window.
+      now = now.add(const Duration(seconds: 59));
+      expect(service.deferringBackgroundLock, isTrue);
 
-        // Step forward 2s — past the 60s max-age. The auto-expire
-        // must run on the next read and the counter must be reclaimed
-        // so the next background lock will actually re-prompt the
-        // user. A force-killed flow whose `finally` never ran must
-        // never leave the lock silently disabled.
-        now = now.add(const Duration(seconds: 2));
-        expect(service.deferringBackgroundLock, isFalse);
-        // A subsequent read stays false (counter is now 0).
-        expect(service.deferringBackgroundLock, isFalse);
-      },
-    );
+      // Step forward 2s — past the 60s max-age. The auto-expire
+      // must run on the next read and the counter must be reclaimed
+      // so the next background lock will actually re-prompt the
+      // user. A force-killed flow whose `finally` never ran must
+      // never leave the lock silently disabled.
+      now = now.add(const Duration(seconds: 2));
+      expect(service.deferringBackgroundLock, isFalse);
+      // A subsequent read stays false (counter is now 0).
+      expect(service.deferringBackgroundLock, isFalse);
+    });
 
-    test(
-      'resetForDetached clears the trusted flow counter even if the '
-      'caller never called endTrustedExternalFlow',
-      () async {
-        final service = await createReadyAppLockService();
-        service.beginTrustedExternalFlow();
-        service.beginTrustedExternalFlow();
-        expect(service.deferringBackgroundLock, isTrue);
-        // Simulate the OS reclaiming the process: detached state
-        // forces a clean slate so the next launch is not stuck in
-        // an un-locked state.
-        service.resetForDetached();
-        expect(service.deferringBackgroundLock, isFalse);
-      },
-    );
+    test('resetForDetached clears the trusted flow counter even if the '
+        'caller never called endTrustedExternalFlow', () async {
+      final service = await createReadyAppLockService();
+      service.beginTrustedExternalFlow();
+      service.beginTrustedExternalFlow();
+      expect(service.deferringBackgroundLock, isTrue);
+      // Simulate the OS reclaiming the process: detached state
+      // forces a clean slate so the next launch is not stuck in
+      // an un-locked state.
+      service.resetForDetached();
+      expect(service.deferringBackgroundLock, isFalse);
+    });
   });
 }

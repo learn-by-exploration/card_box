@@ -17,7 +17,7 @@ class CategoryService extends ChangeNotifier {
   /// the rename. The service must not depend on the repository
   /// directly, so the wiring is opt-in.
   Future<void> Function(String fromLabel, String toLabel)?
-      _categoryMigrationHook;
+  _categoryMigrationHook;
 
   /// Installs (or clears) the migration hook. Pass `null` to remove
   /// the hook — useful in tests and on disposal.

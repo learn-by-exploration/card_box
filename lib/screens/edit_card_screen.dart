@@ -311,10 +311,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-        return _AddHelpSheetContent(
-          preset: widget.preset,
-          editing: editing,
-        );
+        return _AddHelpSheetContent(preset: widget.preset, editing: editing);
       },
     );
   }
@@ -689,7 +686,8 @@ class _EditCardScreenState extends State<EditCardScreen> {
     // is treated as a fresh one-off (e.g. for a card that doesn't
     // store the payload, or because the user genuinely wants a new
     // entry with the same code).
-    final existingDuplicate = widget.existingCard == null ||
+    final existingDuplicate =
+        widget.existingCard == null ||
             widget.existingCard!.barcodePayload.trim() !=
                 scannedCode.payload.trim()
         ? widget.repository.findByBarcodePayload(scannedCode.payload)
@@ -1542,9 +1540,7 @@ class _CardIdentityFields extends StatelessWidget {
         TextFormField(
           controller: issuerController,
           decoration: InputDecoration(
-            labelText: cardType == CardType.visitingCard
-                ? 'Company'
-                : 'Issuer',
+            labelText: cardType == CardType.visitingCard ? 'Company' : 'Issuer',
             border: const OutlineInputBorder(),
           ),
         ),
@@ -1623,7 +1619,9 @@ class _VisitingCardFields extends StatelessWidget {
             icon: Icon(
               extractingDetails ? Icons.hourglass_top : Icons.auto_awesome,
             ),
-            label: Text(extractingDetails ? 'Extracting...' : 'Extract details'),
+            label: Text(
+              extractingDetails ? 'Extracting...' : 'Extract details',
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -1761,10 +1759,8 @@ class _BarcodeFields extends StatelessWidget {
                 'Detected type: ${humanizeValueType(valueType)}',
               if (structuredData.trim().isNotEmpty)
                 'Structured details captured',
-              if (rawBytesHex.trim().isNotEmpty)
-                'Raw bytes captured',
-              if (capturedAt != null)
-                'Scanned: ${capturedAt!.toLocal()}',
+              if (rawBytesHex.trim().isNotEmpty) 'Raw bytes captured',
+              if (capturedAt != null) 'Scanned: ${capturedAt!.toLocal()}',
             ],
           ),
           if (imagePath.trim().isNotEmpty) ...[
@@ -1806,15 +1802,13 @@ class _ScanDuplicateDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(
-            _ScanDuplicateDecision.keepScanning,
-          ),
+          onPressed: () =>
+              Navigator.of(context).pop(_ScanDuplicateDecision.keepScanning),
           child: const Text('Keep new scan'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(
-            _ScanDuplicateDecision.openExisting,
-          ),
+          onPressed: () =>
+              Navigator.of(context).pop(_ScanDuplicateDecision.openExisting),
           child: const Text('Open existing'),
         ),
       ],

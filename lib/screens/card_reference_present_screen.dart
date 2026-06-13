@@ -15,6 +15,7 @@ class CardReferencePresentScreen extends StatefulWidget {
   });
 
   final WalletCard card;
+
   /// Optional callback fired once when the screen first renders.
   /// Used to record that the card was used (marking lastUsedAt and
   /// useCount). The returned future is awaited inside the post-frame
@@ -55,7 +56,9 @@ class _CardReferencePresentScreenState
         try {
           await WakelockPlus.enable();
         } catch (error) {
-          debugPrint('CardReferencePresentScreen: WakelockPlus.enable failed: $error');
+          debugPrint(
+            'CardReferencePresentScreen: WakelockPlus.enable failed: $error',
+          );
           _wakelockAcquired = false;
         }
       }
@@ -66,7 +69,9 @@ class _CardReferencePresentScreenState
         try {
           await callback();
         } catch (error) {
-          debugPrint('CardReferencePresentScreen: onShown callback failed: $error');
+          debugPrint(
+            'CardReferencePresentScreen: onShown callback failed: $error',
+          );
         }
       }
     });
@@ -79,9 +84,13 @@ class _CardReferencePresentScreenState
       // Best-effort: a stuck wakelock is auto-cleared on Android when
       // the Activity is destroyed, but on iOS the idleTimerDisabled
       // flag would otherwise outlive this screen.
-      unawaited(WakelockPlus.disable().catchError((Object error) {
-        debugPrint('CardReferencePresentScreen: WakelockPlus.disable failed: $error');
-      }));
+      unawaited(
+        WakelockPlus.disable().catchError((Object error) {
+          debugPrint(
+            'CardReferencePresentScreen: WakelockPlus.disable failed: $error',
+          );
+        }),
+      );
     }
     _pageController.dispose();
     super.dispose();
