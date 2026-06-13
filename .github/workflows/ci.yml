@@ -196,13 +196,10 @@ jobs:
       - name: Build web
         run: flutter build web --release --base-href /CardBox/
 
-      - name: Copy static docs into web output (when present)
+      - name: Copy static docs into web output
         run: |
-          for f in privacy-policy.html data-safety.html; do
-            if [ -f "docs/$f" ]; then
-              cp "docs/$f" "build/web/$f"
-            fi
-          done
+          cp docs/privacy-policy.html build/web/privacy-policy.html
+          cp docs/data-safety.html    build/web/data-safety.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v4
