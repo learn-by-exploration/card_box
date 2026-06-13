@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 import 'package:card_box/models/wallet_card.dart';
+
+import 'card_database_memory_stub.dart'
+    if (dart.library.io) 'card_database_memory.dart';
 
 part 'card_database.g.dart';
 
@@ -30,7 +32,7 @@ class CardDatabase extends _$CardDatabase {
   }
 
   factory CardDatabase.inMemory() {
-    return CardDatabase(NativeDatabase.memory());
+    return CardDatabase(createInMemoryQueryExecutor());
   }
 
   @override
