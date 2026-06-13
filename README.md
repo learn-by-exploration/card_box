@@ -31,6 +31,9 @@ under the same license.
 
 ## Documents
 
+- [Coding guidelines](docs/engineering/coding-guidelines.md)
+- [Coding guidelines — models, services, widgets, errors, tests, Dart 3](docs/engineering/coding-guidelines-types.md)
+- [V-model lifecycle](docs/engineering/v-model.md)
 - [V-model plan](docs/v_model/plan.md)
 - [Concept of operations](docs/v_model/conops.md)
 - [Operational workflows](docs/v_model/workflows.md)
