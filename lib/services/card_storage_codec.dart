@@ -107,25 +107,36 @@ class CardStorageCodec {
     List<dynamic> cardsValue, {
     required int fromVersion,
   }) {
-    var cardMaps = cardsValue
-        .whereType<Map>()
-        .map((item) => Map<String, Object?>.from(item))
-        .toList();
+    final rawMaps = cardsValue.whereType<Map>().toList();
 
-    for (var version = fromVersion; version < currentSchemaVersion; version++) {
-      cardMaps = switch (version) {
-        1 => cardMaps.map(_migrateCardV1toV2).toList(),
-        2 => cardMaps.map(_migrateCardV2toV3).toList(),
-        3 => cardMaps.map(_migrateCardV3toV4).toList(),
-        4 => cardMaps.map(_migrateCardV4toV5).toList(),
-        _ => cardMaps,
-      };
+    final decoded = <WalletCard>[];
+    for (var index = 0; index < rawMaps.length; index++) {
+      final item = rawMaps[index];
+      try {
+        var cardMap = Map<String, Object?>.from(item);
+        for (var version = fromVersion; version < currentSchemaVersion; version++) {
+          cardMap = switch (version) {
+            1 => _migrateCardV1toV2(cardMap),
+            2 => _migrateCardV2toV3(cardMap),
+            3 => _migrateCardV3toV4(cardMap),
+            4 => _migrateCardV4toV5(cardMap),
+            _ => cardMap,
+          };
+        }
+        final card = WalletCard.fromJson(cardMap);
+        if (card.id.isNotEmpty) {
+          decoded.add(card);
+        }
+      } catch (error) {
+        // A single corrupt card must not poison the whole import.
+        // The user may have a hand-edited backup with one bad
+        // row; the rest still need to come through. Log and
+        // continue so the caller's loop sees only valid cards.
+        // ignore: avoid_print
+        print('CardStorageCodec: skipping corrupt card at index $index: $error');
+      }
     }
-
-    return cardMaps
-        .map(WalletCard.fromJson)
-        .where((card) => card.id.isNotEmpty)
-        .toList();
+    return decoded;
   }
 
   Map<String, Object?> _migrateCardV1toV2(Map<String, Object?> source) {
@@ -277,6 +288,32 @@ class CardStoragePayload {
   final int schemaVersion;
   final bool needsRewrite;
   final List<BackupImagePayload> imageAttachments;
+}
+
+/// Summary of an export run. `rawJson` is the encoded payload ready
+/// to be written to disk. `missingImages` lists the
+/// `cardId` / `side` pairs whose file was not present at export
+/// time (cache wiped, file deleted out-of-band) so the UI can
+/// surface a "N images could not be included" hint instead of
+/// silently dropping the bytes.
+class CardExportSummary {
+  const CardExportSummary({
+    required this.rawJson,
+    required this.missingImages,
+  });
+
+  final String rawJson;
+  final List<MissingCardImage> missingImages;
+}
+
+class MissingCardImage {
+  const MissingCardImage({
+    required this.cardId,
+    required this.side,
+  });
+
+  final String cardId;
+  final String side;
 }
 
 class BackupImagePayload {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:card_box/models/wallet_card.dart';
 
@@ -78,7 +79,14 @@ class CardDatabase extends _$CardDatabase {
 
   Future<List<WalletCard>> loadCards() async {
     final rows = await select(cardRecords).get();
-    return rows.map(_cardFromRow).toList();
+    final cards = <WalletCard>[];
+    for (final row in rows) {
+      final card = _tryDecodeRow(row);
+      if (card != null) {
+        cards.add(card);
+      }
+    }
+    return cards;
   }
 
   Future<bool> isEmpty() async {
@@ -138,15 +146,43 @@ class CardDatabase extends _$CardDatabase {
     );
   }
 
+  WalletCard? _tryDecodeRow(CardRecord row) {
+    try {
+      return _cardFromRow(row);
+    } catch (error) {
+      // Corrupt or partially-written rows must not poison the entire
+      // loadCards() call — the user's other cards should still surface.
+      debugPrint('Skipping corrupt card ${row.id}: $error');
+      return null;
+    }
+  }
+
   WalletCard _cardFromRow(CardRecord row) {
     final decoded = jsonDecode(row.payloadJson);
-    return WalletCard.fromJson((decoded as Map).cast<String, Object?>());
+    if (decoded is! Map<String, Object?>) {
+      throw FormatException(
+        'Card payload for ${row.id} is not a JSON object.',
+      );
+    }
+    return WalletCard.fromJson(decoded);
   }
 
   Future<void> _backfillNormalizedColumns() async {
     final rows = await select(cardRecords).get();
     for (final row in rows) {
-      final card = _cardFromRow(row);
+      WalletCard? card;
+      try {
+        card = _cardFromRow(row);
+      } catch (error) {
+        // A single corrupt row must not abort the v1→v2
+        // migration. The schema upgrade has already been applied;
+        // if we threw, every other card would lose its
+        // normalized columns and search would silently break.
+        // The row's payload is unchanged and loadCards() will
+        // skip it again at read time.
+        debugPrint('Skipping backfill for corrupt card ${row.id}: $error');
+        continue;
+      }
       await (update(cardRecords)..where((tbl) => tbl.id.equals(row.id))).write(
         CardRecordsCompanion(
           nameText: Value(card.name),
@@ -160,6 +196,13 @@ class CardDatabase extends _$CardDatabase {
       );
     }
   }
+
+  /// Visible for tests: re-runs the v1→v2 backfill. Production code
+  /// gets this for free via the migration strategy; tests use it to
+  /// drive the backfill against a database they have hand-corrupted
+  /// to simulate a partial-write scenario.
+  @visibleForTesting
+  Future<void> debugRerunBackfill() => _backfillNormalizedColumns();
 
   String _searchTextForCard(WalletCard card) {
     return <String>[
