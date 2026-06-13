@@ -15,9 +15,14 @@ import UIKit
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    // Flutter 3.44 dropped `binaryMessenger` on FlutterImplicitEngineBridge
+    // in favour of `applicationRegistrar.messenger()`. The path
+    // pluginRegistry -> registrar -> messenger() is the supported way to
+    // reach a FlutterBinaryMessenger from an implicit-engine delegate.
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    documentScannerHandler.register(binaryMessenger: engineBridge.binaryMessenger)
-    fileShareHandler.register(binaryMessenger: engineBridge.binaryMessenger)
-    settingsHandler.register(binaryMessenger: engineBridge.binaryMessenger)
+    let messenger = engineBridge.applicationRegistrar.messenger()
+    documentScannerHandler.register(binaryMessenger: messenger)
+    fileShareHandler.register(binaryMessenger: messenger)
+    settingsHandler.register(binaryMessenger: messenger)
   }
 }
