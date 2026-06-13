@@ -1,4 +1,4 @@
-import 'wallet_card.dart';
+import 'package:card_box/models/wallet_card.dart';
 
 /// How the home screen orders the visible card list. Persisted across
 /// launches via shared preferences; the storage is the caller's

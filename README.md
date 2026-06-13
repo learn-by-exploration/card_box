@@ -31,9 +31,41 @@ under the same license.
 
 ## Documents
 
+### Engineering practice (synced from board_box)
+
+These docs were authored for board_box and ported here. The file
+references in the worked examples are board_box-specific (e.g.
+`KlondikeModel`, `GameStats`, iOS `Runner.messenger`); the patterns
+and rules are universal Flutter/Dart practice and apply here as-is.
+
 - [Coding guidelines](docs/engineering/coding-guidelines.md)
 - [Coding guidelines — models, services, widgets, errors, tests, Dart 3](docs/engineering/coding-guidelines-types.md)
 - [V-model lifecycle](docs/engineering/v-model.md)
+- [Flutter / Dart style — lint rationale](docs/engineering/flutter-dart-style.md)
+- [Testing strategy](docs/engineering/testing-strategy.md)
+- [CI/CD](docs/engineering/ci-cd.md)
+- [Bug-hunt process](docs/engineering/bug-hunt-process.md)
+- [Per-PR code review checklist](docs/engineering/code-review-checklist.md)
+- [Secrets & privacy](docs/engineering/secrets-and-privacy.md)
+- [UI/UX reference](docs/engineering/ui-ux-reference.md)
+
+### Design process (synced from board_box)
+
+- [01 — Design process](docs/design/01-design-process.md)
+- [02 — Architecture](docs/design/02-architecture.md)
+- [03 — Design system](docs/design/03-design-system.md)
+- [04 — UI/UX principles](docs/design/04-ui-ux-principles.md)
+- [05 — Component library](docs/design/05-component-library.md)
+- [06 — Feature decomposition](docs/design/06-feature-decomposition.md)
+- [07 — PR review checklist](docs/design/07-pr-review-checklist.md)
+- [08 — AI assistant guide](docs/design/08-ai-assistant-guide.md)
+
+### V-Model artifacts (card_box-native)
+
+The artifact set for card_box's own V-Model. The V-Model
+*lifecycle* doc (linked under "Engineering practice" above) maps the
+V to these artifacts and to the design/ tree above.
+
 - [V-model plan](docs/v_model/plan.md)
 - [Concept of operations](docs/v_model/conops.md)
 - [Operational workflows](docs/v_model/workflows.md)
@@ -44,8 +76,11 @@ under the same license.
 - [Decision record](docs/v_model/decision_record.md)
 - [Traceability matrix](docs/v_model/traceability_matrix.md)
 - [Implementation status](docs/v_model/implementation_status.md)
-- [Research notes](docs/research/initial_research.md)
 - [Open questions](docs/v_model/open_questions.md)
+
+### Project-local research and testing
+
+- [Research notes](docs/research/initial_research.md)
 - [Android device acceptance](docs/testing/android_device_acceptance.md)
 - [Android device validation matrix](docs/testing/android_device_matrix.md)
 - [Android test session log](docs/testing/android_test_session_log.md)

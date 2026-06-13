@@ -5,8 +5,8 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 import 'package:card_box/models/wallet_card.dart';
 
-import 'card_database_memory_stub.dart'
-    if (dart.library.io) 'card_database_memory.dart';
+import 'package:card_box/services/card_database_memory_stub.dart'
+    if (dart.library.io) 'package:card_box/services/card_database_memory.dart';
 
 part 'card_database.g.dart';
 

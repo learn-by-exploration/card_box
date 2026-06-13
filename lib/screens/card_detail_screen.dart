@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,7 +78,7 @@ class CardDetailScreen extends StatelessWidget {
                   if (!context.mounted) {
                     return;
                   }
-                  Navigator.of(context).push(
+                  unawaited(Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => EditCardScreen(
                         repository: repository,
@@ -86,7 +88,7 @@ class CardDetailScreen extends StatelessWidget {
                         existingCard: card,
                       ),
                     ),
-                  );
+                  ));
                 },
               ),
             ],
