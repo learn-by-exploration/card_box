@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:card_box/models/backup_file_info.dart';
@@ -92,7 +93,16 @@ class BackupFileService {
         return Directory('${downloads.path}/Card Box');
       }
     } on UnsupportedError {
-      // Fall through to app documents below.
+      // Some platforms (web, desktop) do not implement a downloads
+      // directory. Fall through to app documents below.
+    } on PlatformException {
+      // The iOS Files app or Android scoped storage can return a
+      // platform exception if the user has revoked access or the
+      // picker is unavailable. Treat the same as unsupported and
+      // fall back to the app documents directory.
+    } on MissingPluginException {
+      // In a test or on a stripped-down Flutter embedder, the
+      // downloads channel is missing entirely. Fall back too.
     }
     final directory = await getApplicationDocumentsDirectory();
     return Directory('${directory.path}/backups');

@@ -51,6 +51,18 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) {
+      // Hot-restart or fast-back can deliver lifecycle events after
+      // dispose. Bail out before any setState to avoid the
+      // "setState called after dispose" assertion.
+      return;
+    }
+    if (state == AppLifecycleState.detached) {
+      // The OS is reclaiming the process — drop any in-flight
+      // trusted-flow counter so the next launch does not inherit
+      // a stale "lock is deferred" state.
+      widget.appLockService.resetForDetached();
+    }
     if (state == AppLifecycleState.resumed) {
       if (_obscureContent) {
         setState(() => _obscureContent = false);

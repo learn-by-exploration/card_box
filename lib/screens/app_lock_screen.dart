@@ -9,15 +9,32 @@ class AppLockScreen extends StatefulWidget {
   final AppLockService appLockService;
 
   @override
-  State<AppLockScreen> createState() => _AppLockScreenState();
+  State<AppLockScreen> createState() => AppLockScreenState();
 }
 
-class _AppLockScreenState extends State<AppLockScreen> {
+class AppLockScreenState extends State<AppLockScreen> {
   final _pinController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String _message = '';
   bool _submitting = false;
   bool _autoTried = false;
+
+  /// Wall-clock of the last biometric retry we actually fired.
+  /// Used to debounce the retry button so a frantic user cannot
+  /// hammer the local_auth API in a tight loop. Visible for
+  /// tests so the debounce window can be exercised deterministically.
+  DateTime? _lastBiometricAttempt;
+
+  /// Minimum spacing between biometric attempts. 500ms is short
+  /// enough to feel responsive on a real retry but long enough
+  /// to coalesce a triple-tap. The local_auth plugin queues
+  /// prompts; without this guard the queue grows and the OS
+  /// eventually shows the wrong prompt on top of the wrong state.
+  static const _biometricDebounce = Duration(milliseconds: 500);
+
+  /// Test seam: lets widget tests inject a clock.
+  @visibleForTesting
+  DateTime Function() now = DateTime.now;
 
   @override
   void didChangeDependencies() {
@@ -162,6 +179,18 @@ class _AppLockScreenState extends State<AppLockScreen> {
     final appLock = widget.appLockService;
     if (!appLock.biometricEnabled || !appLock.biometricAvailable) {
       return;
+    }
+    // Skip the debounce on the auto-triggered first attempt —
+    // the screen just opened, the user has not had a chance to
+    // hammer the button. Spamming-tap protection matters for
+    // explicit retry only.
+    if (!auto) {
+      final now = this.now();
+      final last = _lastBiometricAttempt;
+      if (last != null && now.difference(last) < _biometricDebounce) {
+        return;
+      }
+      _lastBiometricAttempt = now;
     }
     final success = await appLock.unlockWithBiometrics();
     if (!mounted || success || auto) {

@@ -10,6 +10,7 @@ import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/recovered_media_draft.dart';
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/screens/app_lock_settings_screen.dart';
+import 'package:card_box/screens/app_lock_screen.dart';
 import 'package:card_box/screens/app_root.dart';
 import 'package:card_box/screens/card_detail_screen.dart';
 import 'package:card_box/screens/card_search_screen.dart';
@@ -519,6 +520,82 @@ void main() {
         findsNothing,
       );
     });
+
+    testWidgets(
+      'AppLockScreen debounces rapid biometric retries',
+      (tester) async {
+        // The user can mash the "Use biometrics" button faster
+        // than the OS biometric prompt can dismiss itself. The
+        // screen must coalesce those taps into a single
+        // authenticate call so the OS does not get out of sync.
+        final auth = FakeDeviceAuthService(
+          biometricsEnrolled: true,
+          supported: true,
+          authenticateResult: false,
+        );
+        final appLockService = await createReadyAppLockService(
+          lockEnabled: true,
+          biometricsEnabled: true,
+          pin: '1234',
+          deviceAuthService: auth,
+        );
+        // Make the service report biometrics as available; the
+        // fake has biometricsEnrolled = true but the service
+        // caches availability on init.
+        appLockService.setBiometricAvailability(true);
+        // A controllable clock so the test can step the debounce
+        // window forward without sleeping.
+        var virtualNow = DateTime(2026, 6, 4);
+        await tester.pumpWidget(
+          wrapForTest(AppLockScreen(appLockService: appLockService)),
+        );
+        // Find the state and inject the controllable clock by
+        // locating the State via the element tree.
+        final state =
+            tester.state<AppLockScreenState>(find.byType(AppLockScreen));
+        state.now = () => virtualNow;
+
+        // First tap goes through. The auto-attempt on mount has
+        // already fired (biometricsEnrolled is true) so this tap
+        // is the user's first manual retry.
+        final biometricButton = find.text('Use biometrics');
+        // Pump to let the auto-attempt finish.
+        await tester.pump();
+        await tester.pump();
+        final callsAfterAuto = auth.authenticateCalls;
+
+        await tester.tap(biometricButton);
+        await tester.pump();
+        await tester.pump();
+        expect(
+          auth.authenticateCalls,
+          callsAfterAuto + 1,
+          reason: 'First manual retry must hit the auth API.',
+        );
+
+        // A second tap within the debounce window must be ignored.
+        await tester.tap(biometricButton);
+        await tester.pump();
+        await tester.pump();
+        expect(
+          auth.authenticateCalls,
+          callsAfterAuto + 1,
+          reason: 'Second retry inside the debounce window must be dropped.',
+        );
+
+        // Step the clock past the debounce and a third tap should
+        // go through.
+        virtualNow = virtualNow.add(const Duration(seconds: 1));
+        await tester.tap(biometricButton);
+        await tester.pump();
+        await tester.pump();
+        expect(
+          auth.authenticateCalls,
+          callsAfterAuto + 2,
+          reason: 'A retry after the debounce window must reach the API.',
+        );
+      },
+    );
   });
 
   group('Settings and detail screens', () {

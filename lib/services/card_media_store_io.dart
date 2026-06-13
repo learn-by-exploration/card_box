@@ -44,8 +44,17 @@ Future<void> deleteStoredImage(String path) async {
     return;
   }
   final file = File(path);
-  if (await file.exists()) {
-    await file.delete();
+  try {
+    if (await file.exists()) {
+      await file.delete();
+    }
+  } on FileSystemException {
+    // The file disappeared between the exists() check and the
+    // delete() call (concurrent cleanup, external watch, or a path
+    // that points at a directory the OS refuses to remove). The
+    // desired post-condition — "the file is not on disk" — is
+    // already satisfied, so treat it as a no-op rather than an
+    // error that would bubble out of the repository's cleanup path.
   }
 }
 

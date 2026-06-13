@@ -33,6 +33,12 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       const DeviceSettingsService();
   late MobileScannerController _controller;
   _ScanMode _scanMode = _ScanMode.barcode;
+  /// Completes when the active controller has finished disposing.
+  /// The lifecycle observer (and any pending stop/restart) must
+  /// await this before touching the controller, otherwise a fast
+  /// in/out of the screen can race `dispose()` and `stop()` and
+  /// throw `MobileScannerException(controllerDisposed)`.
+  Completer<void>? _controllerDisposed;
   bool _scannerEnabled = false;
   bool _didReturnResult = false;
   bool _switchingMode = false;
@@ -56,12 +62,36 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_controller.dispose());
+    final completer = Completer<void>();
+    _controllerDisposed = completer;
+    unawaited(_disposeControllerSafely(_controller, completer));
     super.dispose();
+  }
+
+  /// Disposes [controller] and signals completion on [done]. Errors
+  /// from the underlying platform call are swallowed — the screen
+  /// is already on its way out and there is no recovery path.
+  Future<void> _disposeControllerSafely(
+    MobileScannerController controller,
+    Completer<void> done,
+  ) async {
+    try {
+      await controller.dispose();
+    } finally {
+      if (!done.isCompleted) {
+        done.complete();
+      }
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) {
+      // Hot-restart or fast-back can deliver lifecycle events after
+      // dispose. Bail out before touching the controller or calling
+      // any setState.
+      return;
+    }
     switch (state) {
       case AppLifecycleState.resumed:
         if ((!_resumeScannerAfterSettings && !_resumeScannerAfterBackground) ||
@@ -337,6 +367,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
     }
     final oldController = _controller;
     final newController = _buildController(mode);
+    final oldDisposed = Completer<void>();
+    _controllerDisposed = oldDisposed;
     setState(() {
       _switchingMode = true;
       _scanMode = mode;
@@ -350,23 +382,34 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
       _scannerErrorMessage = null;
     });
     await Future<void>.delayed(Duration.zero);
-    await oldController.dispose();
+    // Wrap the rest in try/finally so `_switchingMode` is always
+    // reset, even if dispose() or _startScanner() throws. Leaving
+    // the flag stuck at true would freeze the scanner UI on
+    // "Updating the scanner…".
+    try {
+      await _disposeControllerSafely(oldController, oldDisposed);
 
-    if (!mounted) {
-      await newController.dispose();
-      return;
-    }
+      if (!mounted) {
+        await newController.dispose();
+        return;
+      }
 
-    if (_scannerEnabled) {
-      await _startScanner();
-    }
+      if (_scannerEnabled) {
+        await _startScanner();
+      }
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _switchingMode = false;
+        });
+      } else {
+        _switchingMode = false;
+      }
     }
-    setState(() {
-      _switchingMode = false;
-    });
   }
 
   void _handleDetection(BarcodeCapture capture) {
@@ -737,6 +780,12 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen>
   }
 
   Future<void> _suspendScannerForBackground() async {
+    // Wait for any in-progress dispose() to finish so we do not
+    // call stop() on a controller that has already been torn down.
+    final disposed = _controllerDisposed;
+    if (disposed != null) {
+      await disposed.future;
+    }
     try {
       await _controller.stop();
     } catch (_) {

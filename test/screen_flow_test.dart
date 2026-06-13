@@ -309,7 +309,9 @@ void main() {
           updatedAt: DateTime(2026, 6, 7, 10),
         ),
       );
-      final cryptoService = FakeBackupCryptoService(decryptedJson: plainJson);
+      final cryptoService = FakeBackupCryptoService(
+        decryptedJson: plainJson.rawJson,
+      );
       final password = 'password123';
       const encryptedJson = '{"format":"card_box_encrypted_backup"}';
       final appLockService = await createReadyAppLockService();

@@ -9,6 +9,7 @@ import 'package:card_box/services/category_service.dart';
 import 'package:card_box/services/media_recovery_service.dart';
 import 'package:card_box/services/theme_service.dart';
 import 'package:card_box/theme.dart';
+import 'package:card_box/models/card_category.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,20 @@ void main() async {
     legacyPreferences: preferences,
   );
   await repository.init();
+  // When a custom category is renamed, every card whose
+  // `customCategory` matched the old label must be rewritten to the
+  // new one — otherwise the rename orphans the cards. The service
+  // only knows the labels; the repository owns the cards, so it
+  // installs the hook here.
+  await categoryService.setCategoryMigrationHook(
+    (from, to) async {
+      await repository.migrateCustomCategory(
+        fromLabel: from,
+        toCategory: CardCategory.other,
+        toCustomCategory: to,
+      );
+    },
+  );
   final recoveredMediaDraft = await mediaRecoveryService
       .recoverLostPhotoDraft();
   final appLockService = AppLockService(preferences: preferences);

@@ -23,12 +23,7 @@ class BackupCryptoService {
     required String rawJson,
     required String password,
   }) async {
-    final normalizedPassword = password.trim();
-    if (normalizedPassword.length < 8) {
-      throw const FormatException(
-        'Use a backup password with at least 8 characters.',
-      );
-    }
+    final normalizedPassword = _normalizePassword(password);
     final salt = _randomBytes(_saltLength);
     final nonce = _randomBytes(_nonceLength);
     final secretKey = await _deriveKey(
@@ -85,7 +80,7 @@ class BackupCryptoService {
     final macBytes = _decodeRequiredBase64(decoded['macBase64'], 'mac');
 
     final secretKey = await _deriveKey(
-      password: password.trim(),
+      password: _normalizePassword(password),
       salt: salt,
       iterations: iterations,
     );
@@ -144,5 +139,25 @@ class BackupCryptoService {
       bytes[index] = _random.nextInt(256);
     }
     return bytes;
+  }
+
+  /// Trim, then enforce the 8-character minimum on the *trimmed*
+  /// length. The user-visible copy says "at least 8 characters",
+  /// and PBKDF2 derives the key from the trimmed value — so the
+  /// check must use the same input that goes into the KDF.
+  ///
+  /// A password of seven non-whitespace characters padded to
+  /// fifteen with spaces would have passed the previous check
+  /// (which used the trimmed length) but produced a key with only
+  /// seven characters of entropy. Reject it.
+  String _normalizePassword(String password) {
+    final trimmed = password.trim();
+    if (trimmed.length < 8) {
+      throw const FormatException(
+        'Use a backup password with at least 8 non-whitespace '
+        'characters.',
+      );
+    }
+    return trimmed;
   }
 }

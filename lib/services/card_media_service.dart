@@ -296,7 +296,7 @@ class CardMediaService {
       final tightened = await _photoTightener.tighten(rawBytes);
       return await _mediaStore
           .storeImageBytes(
-            tightened,
+            tightened.bytes,
             sourcePath: capture.file.path,
             cardId: cardId,
             side: side,

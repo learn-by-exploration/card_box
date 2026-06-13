@@ -9,17 +9,28 @@ class AppLockService extends ChangeNotifier {
     required this.preferences,
     SecureStore? secureStore,
     DeviceAuthService? deviceAuthService,
+    DateTime Function()? clock,
   }) : _secureStore = secureStore ?? FlutterSecureStore(),
-       _deviceAuthService = deviceAuthService ?? LocalDeviceAuthService();
+       _deviceAuthService = deviceAuthService ?? LocalDeviceAuthService(),
+       _clock = clock ?? DateTime.now;
 
   static const pinKey = 'card_box.app_lock.pin';
   static const lockEnabledKey = 'card_box.app_lock.enabled';
   static const biometricEnabledKey = 'card_box.app_lock.biometric_enabled';
   static const lockOnResumeKey = 'card_box.app_lock.lock_on_resume';
 
+  /// A trusted external flow (e.g. the camera scanner, an in-app
+  /// browser) asks the lock service to skip the next background-lock
+  /// re-prompt. If the OS force-kills the activity while a flow is
+  /// still marked as trusted, a `finally` may never run and the
+  /// counter would stay elevated forever. The 60s max-age guarantees
+  /// the trust window is reclaimed no matter what.
+  static const _trustedFlowMaxAge = Duration(seconds: 60);
+
   final SharedPreferences preferences;
   final SecureStore _secureStore;
   final DeviceAuthService _deviceAuthService;
+  final DateTime Function() _clock;
 
   bool _ready = false;
   bool _lockEnabled = false;
@@ -29,15 +40,33 @@ class AppLockService extends ChangeNotifier {
   bool _biometricAvailable = false;
   bool _authenticating = false;
   int _trustedExternalFlowCount = 0;
+  DateTime? _trustedFlowStartedAt;
 
   bool get ready => _ready;
   bool get lockEnabled => _lockEnabled;
   bool get biometricEnabled => _biometricEnabled;
   bool get lockOnResume => _lockOnResume;
   bool get unlocked => _unlocked;
-  bool get biometricAvailable => _biometricAvailable;
   bool get authenticating => _authenticating;
-  bool get deferringBackgroundLock => _trustedExternalFlowCount > 0;
+  bool get biometricAvailable => _biometricAvailable;
+  bool get deferringBackgroundLock {
+    if (_trustedExternalFlowCount == 0) {
+      return false;
+    }
+    final startedAt = _trustedFlowStartedAt;
+    if (startedAt != null &&
+        _clock().difference(startedAt) > _trustedFlowMaxAge) {
+      // The trust window has outlived its expected lifetime — most
+      // likely because an external flow was force-killed and its
+      // `finally` never executed. Reclaim the counter so the next
+      // background-lock check will actually re-prompt the user.
+      _trustedExternalFlowCount = 0;
+      _trustedFlowStartedAt = null;
+      return false;
+    }
+    return true;
+  }
+
   bool get shouldShowLockScreen => ready && lockEnabled && !unlocked;
 
   Future<void> init() async {
@@ -130,6 +159,7 @@ class AppLockService extends ChangeNotifier {
 
   void beginTrustedExternalFlow() {
     _trustedExternalFlowCount += 1;
+    _trustedFlowStartedAt = _clock();
   }
 
   void endTrustedExternalFlow() {
@@ -137,5 +167,26 @@ class AppLockService extends ChangeNotifier {
       return;
     }
     _trustedExternalFlowCount -= 1;
+    if (_trustedExternalFlowCount == 0) {
+      _trustedFlowStartedAt = null;
+    }
+  }
+
+  /// Force-clear the trust window. Called from the lifecycle
+  /// observer when the activity enters `AppLifecycleState.detached`
+  /// (OS is reclaiming the process); the activity may never come
+  /// back, so any pending trust counter would otherwise survive
+  /// the process death as stale state.
+  void resetForDetached() {
+    _trustedExternalFlowCount = 0;
+    _trustedFlowStartedAt = null;
+  }
+
+  /// Visible for tests: lets a test pin the cached biometric
+  /// availability without going through [init] (which would also
+  /// re-read the lock-enabled flag from preferences).
+  @visibleForTesting
+  void setBiometricAvailability(bool value) {
+    _biometricAvailable = value;
   }
 }

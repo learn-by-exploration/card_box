@@ -5,6 +5,7 @@ import 'package:card_box/services/app_lock_service.dart';
 import 'package:card_box/services/backup_crypto_service.dart';
 import 'package:card_box/services/backup_file_service.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/services/card_storage_codec.dart';
 import 'package:card_box/services/file_share_service.dart';
 import 'package:card_box/theme.dart';
 
@@ -163,10 +164,14 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
     await _exportBackupFile(
       mode: _BackupExportMode.encrypted,
       rawJsonLoader: () async {
-        final plainJson = await widget.repository.exportPlainJson();
-        return widget.backupCryptoService.encryptJson(
-          rawJson: plainJson,
+        final summary = await widget.repository.exportPlainJson();
+        final encrypted = await widget.backupCryptoService.encryptJson(
+          rawJson: summary.rawJson,
           password: password,
+        );
+        return CardExportSummary(
+          rawJson: encrypted,
+          missingImages: summary.missingImages,
         );
       },
       fileNamePrefix: 'card_box_backup_encrypted',
@@ -175,7 +180,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
 
   Future<void> _exportBackupFile({
     required _BackupExportMode mode,
-    required Future<String> Function() rawJsonLoader,
+    required Future<CardExportSummary> Function() rawJsonLoader,
     required String fileNamePrefix,
   }) async {
     try {
@@ -184,8 +189,9 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         _message = '';
       });
       widget.appLockService.beginTrustedExternalFlow();
+      final summary = await rawJsonLoader();
       final backup = await widget.backupFileService.createBackupFile(
-        rawJson: await rawJsonLoader(),
+        rawJson: summary.rawJson,
         cardCount: widget.repository.cards.length,
         fileNamePrefix: fileNamePrefix,
       );
@@ -198,11 +204,17 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         subject: backup.fileName,
         text: 'Card Box backup file',
       );
+      final missingSuffix = summary.missingImages.isEmpty
+          ? ''
+          : ' ${summary.missingImages.length} image(s) could not be '
+              'included because the file was missing — re-importing '
+              'this backup on the original device will restore them.';
       setState(() {
         _latestBackup = backup;
         _message =
             '${mode == _BackupExportMode.encrypted ? 'Encrypted' : 'Standard'} backup file created: ${backup.fileName}'
-            '${shared ? ' and opened in the share sheet.' : '.'}';
+            '${shared ? ' and opened in the share sheet.' : '.'}'
+            '$missingSuffix';
       });
     } on UnsupportedError catch (error) {
       setState(() => _message = error.message ?? 'Backup export unavailable.');

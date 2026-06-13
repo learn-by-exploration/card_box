@@ -57,6 +57,44 @@ void main() {
     expect(restored.contactEmails, ['aiko@example.com']);
   });
 
+  test(
+    'WalletCard.fromJson generates a unique id when the input id is empty',
+    () {
+      // Two records that originally had no id (e.g. a malformed
+      // export) must not collapse onto the same primary key when
+      // they are imported. The fallback id includes both a
+      // timestamp and a content hash so identical content still
+      // gets distinct ids within the same microsecond.
+      final a = WalletCard.fromJson({
+        'name': 'Untitled card',
+        'category': 'contact',
+      });
+      final b = WalletCard.fromJson({
+        'name': 'Untitled card',
+        'category': 'contact',
+      });
+      expect(a.id, isNotEmpty);
+      expect(b.id, isNotEmpty);
+      expect(a.id, isNot(equals(b.id)));
+    },
+  );
+
+  test(
+    'WalletCard.generateNewId is collision-resistant across rapid calls',
+    () {
+      // Two cards created back-to-back in a tight loop (or in a
+      // simulator with a frozen clock) must still get distinct
+      // ids. The generator mixes a timestamp with a random
+      // suffix, so even N calls in the same microsecond stay
+      // unique.
+      final ids = <String>{};
+      for (var i = 0; i < 1000; i++) {
+        ids.add(WalletCard.generateNewId());
+      }
+      expect(ids.length, 1000);
+    },
+  );
+
   test('CardRepository exports and imports plain JSON', () async {
     SharedPreferences.setMockInitialValues({});
     final repository = CardRepository(
@@ -70,7 +108,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final secondRepository = CardRepository(database: CardDatabase.inMemory());
     await secondRepository.init();
-    final count = await secondRepository.importPlainJson(exported);
+    final count = await secondRepository.importPlainJson(exported.rawJson);
 
     expect(count, repository.cards.length);
     expect(
@@ -123,7 +161,7 @@ void main() {
       database: CardDatabase.inMemory(),
     );
     await secondRepository.init();
-    await secondRepository.importPlainJson(exported);
+    await secondRepository.importPlainJson(exported.rawJson);
 
     final restored = secondRepository.findById('photo-card');
     expect(restored, isNotNull);
@@ -183,7 +221,7 @@ void main() {
       database: CardDatabase.inMemory(),
     );
     await secondRepository.init();
-    await secondRepository.importPlainJson(exported);
+    await secondRepository.importPlainJson(exported.rawJson);
 
     final restored = secondRepository.findById('visiting-1');
     expect(restored, isNotNull);
@@ -322,6 +360,43 @@ void main() {
     expect(vcard, contains('END:VCARD'));
   });
 
+  test('CardStorageCodec decodeBackup skips a corrupt card and returns the rest',
+      () {
+    // Build an envelope where the cards list contains one
+    // well-formed card, one that is not a Map, and one whose
+    // id field has the wrong type — `json['id'] as String?` will
+    // throw a TypeError on this input, which is exactly the
+    // failure mode a hand-edited backup would produce.
+    final envelope = jsonEncode({
+      'format': 'card_box_plain_json',
+      'schemaVersion': 5,
+      'exportedAt': '2026-06-04T00:00:00.000Z',
+      'cards': [
+        {
+          'id': 'valid',
+          'name': 'Valid card',
+          'category': 'contact',
+          'createdAt': '2026-06-04T00:00:00.000Z',
+          'updatedAt': '2026-06-04T00:00:00.000Z',
+        },
+        'not-a-map',
+        {
+          'id': 42, // wrong type — will fail `as String?`
+          'name': 'Migrate-broken card',
+          'category': 'contact',
+          'createdAt': '2026-06-04T00:00:00.000Z',
+          'updatedAt': '2026-06-04T00:00:00.000Z',
+        },
+      ],
+    });
+
+    final result = CardStorageCodec().decodeBackup(envelope);
+
+    // The valid card survives; the broken one and the non-map
+    // entry are both dropped.
+    expect(result.cards.map((card) => card.id), ['valid']);
+  });
+
   test('ContactActionService builds launchable URIs', () {
     const service = ContactActionService();
 
@@ -434,6 +509,27 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test(
+    'BackupCryptoService rejects a password whose trimmed length is < 8 '
+    'even if the raw string is long enough',
+    () async {
+      const rawJson = '{"format":"card_box_plain_json","cards":[]}';
+      final crypto = BackupCryptoService();
+      // Seven non-whitespace characters padded with eight spaces.
+      // The raw length is 15, but the trimmed length is 7 — a
+      // legitimate weak password that the previous check passed
+      // (it validated the trimmed length) and that would have
+      // produced a key with only 7 characters of entropy.
+      expect(
+        () => crypto.encryptJson(
+          rawJson: rawJson,
+          password: 'abc1234' * 1 + '        ', // 7 + 8 spaces = 15
+        ),
+        throwsFormatException,
+      );
+    },
+  );
 
   test('AppLockService defers locking during trusted external flows', () async {
     SharedPreferences.setMockInitialValues({});

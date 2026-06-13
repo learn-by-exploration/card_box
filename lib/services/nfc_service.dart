@@ -91,6 +91,27 @@ class NfcService {
     }
 
     final completer = Completer<NfcScanResult>();
+    // Single-flight tear-down: every completion path (success,
+    // iOS session error, timeout, caller cancel) routes through
+    // `_tearDown` and `_tearDown` is idempotent. Without this
+    // guard, the iOS NFC sheet can outlive the calling widget
+    // when two completion paths race (e.g. timeout fires
+    // simultaneously with a discovered-tag callback).
+    var stopped = false;
+    Future<void> tearDown({
+      String? alertMessageIos,
+      String? errorMessageIos,
+    }) async {
+      if (stopped) {
+        return;
+      }
+      stopped = true;
+      await _stopSessionSafely(
+        alertMessageIos: alertMessageIos,
+        errorMessageIos: errorMessageIos,
+      );
+    }
+
     try {
       await _sessionClient.startSession(
         pollingOptions: const {
@@ -100,23 +121,35 @@ class NfcService {
         },
         alertMessageIos: 'Hold your phone near the card.',
         onSessionErrorIos: (error) {
-          if (!completer.isCompleted) {
-            completer.complete(
-              NfcScanResult(
-                status: CompatibilityStatus.unsupported,
-                summary: 'NFC session error: ${error.message}',
-                detail: 'The iOS reader session ended before a tag was saved.',
-              ),
-            );
+          if (completer.isCompleted) {
+            return;
           }
+          completer.complete(
+            NfcScanResult(
+              status: CompatibilityStatus.unsupported,
+              summary: 'NFC session error: ${error.message}',
+              detail: 'The iOS reader session ended before a tag was saved.',
+            ),
+          );
+          // The iOS sheet must be torn down here too — otherwise it
+          // outlives the caller and the user is stuck with a
+          // persistent modal after the underlying screen has gone.
+          unawaited(tearDown());
         },
         onDiscovered: (tag) async {
+          if (completer.isCompleted) {
+            // Late tag delivery after a timeout / cancel: drop
+            // the work, but still tear down so the iOS sheet
+            // dismisses.
+            await tearDown();
+            return;
+          }
           try {
             final result = await _buildResult(tag);
             if (!completer.isCompleted) {
               completer.complete(result);
             }
-            await _stopSessionSafely(alertMessageIos: 'Tag read complete.');
+            await tearDown(alertMessageIos: 'Tag read complete.');
           } catch (error) {
             if (!completer.isCompleted) {
               completer.complete(
@@ -127,7 +160,7 @@ class NfcService {
                 ),
               );
             }
-            await _stopSessionSafely(
+            await tearDown(
               errorMessageIos: 'Unable to read this card.',
             );
           }
@@ -137,9 +170,21 @@ class NfcService {
       return completer.future.timeout(
         _sessionTimeout,
         onTimeout: () async {
-          await _stopSessionSafely(
+          if (!completer.isCompleted) {
+            completer.complete(
+              const NfcScanResult(
+                status: CompatibilityStatus.unsupported,
+                summary: 'No NFC card was detected in time.',
+                detail: 'Try again with the card closer to the phone.',
+              ),
+            );
+          }
+          await tearDown(
             errorMessageIos: 'Timed out waiting for a card.',
           );
+          // Returning the same instance the completer was given is
+          // safe — both code paths produce the same shape and
+          // `completer.future` resolves before this returns.
           return const NfcScanResult(
             status: CompatibilityStatus.unsupported,
             summary: 'No NFC card was detected in time.',
@@ -148,7 +193,7 @@ class NfcService {
         },
       );
     } catch (error) {
-      await _stopSessionSafely();
+      await tearDown();
       return NfcScanResult(
         status: CompatibilityStatus.unsupported,
         summary: 'The NFC session could not be started.',
@@ -367,9 +412,12 @@ class NfcService {
         alertMessageIos: alertMessageIos,
         errorMessageIos: errorMessageIos,
       );
-    } catch (_) {
+    } catch (error) {
       // Session shutdown can race with device state; avoid surfacing that as a
       // user-facing failure when we already have a meaningful result.
+      if (kDebugMode) {
+        debugPrint('NfcService: stopSession race, ignoring: $error');
+      }
     }
   }
 }

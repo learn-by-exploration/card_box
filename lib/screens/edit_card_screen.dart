@@ -104,7 +104,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
     _draftCardId =
         widget.recoveredMediaDraft?.draftCardId ??
         card?.id ??
-        'draft-${DateTime.now().microsecondsSinceEpoch}';
+        WalletCard.generateNewId(prefix: 'draft');
     if (card == null) {
       _applyPreset();
       _applyRecoveredMediaDraft();
@@ -571,7 +571,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
       hasBarcode: hasBarcode,
     );
     final card = WalletCard(
-      id: existing?.id ?? 'card-${now.microsecondsSinceEpoch}',
+      id: existing?.id ?? WalletCard.generateNewId(),
       name: _nameController.text.trim(),
       issuer: _issuerController.text.trim(),
       category: _category,

@@ -307,9 +307,12 @@ class _SentinelTightener implements CardPhotoTightener {
   int callCount = 0;
 
   @override
-  Future<Uint8List> tighten(Uint8List jpegBytes) async {
+  Future<TightenResult> tighten(Uint8List jpegBytes) async {
     callCount += 1;
-    return sentinel;
+    return TightenResult(
+      bytes: sentinel,
+      reason: TightenReason.tightened,
+    );
   }
 }
 
@@ -1071,15 +1074,18 @@ void main() {
     test('tighten is a no-op on empty bytes', () async {
       const tightener = DefaultCardPhotoTightener();
       final result = await tightener.tighten(Uint8List(0));
-      expect(result, isEmpty);
+      expect(result.bytes, isEmpty);
+      expect(result.reason, TightenReason.noChange);
     });
 
     test('tighten returns original bytes on garbage (non-JPEG) input', () async {
       const tightener = DefaultCardPhotoTightener();
       final garbage = Uint8List.fromList(<int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       final result = await tightener.tighten(garbage);
-      // image.decodeJpg returns null → tightener returns the original bytes.
-      expect(result, equals(garbage));
+      // image.decodeJpg throws on garbage → caught by the inner
+      // try/catch and reported as an internal error.
+      expect(result.bytes, equals(garbage));
+      expect(result.reason, TightenReason.internalError);
     });
 
     test(
@@ -1095,7 +1101,7 @@ void main() {
         // Either tightened (if the failure path swallows everything and
         // returns original) or pass-through. Both are non-error behaviors.
         expect(result, isNotNull);
-        expect(result.length, greaterThan(0));
+        expect(result.bytes.length, greaterThan(0));
         // The recognizer's close() must still have been called.
         expect(recognizer.closeCalls, 1);
       },
