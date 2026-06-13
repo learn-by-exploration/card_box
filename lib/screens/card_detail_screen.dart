@@ -78,17 +78,19 @@ class CardDetailScreen extends StatelessWidget {
                   if (!context.mounted) {
                     return;
                   }
-                  unawaited(Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => EditCardScreen(
-                        repository: repository,
-                        appLockService: appLockService,
-                        categoryService: categoryService,
-                        mediaRecoveryService: recoveryService,
-                        existingCard: card,
+                  unawaited(
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EditCardScreen(
+                          repository: repository,
+                          appLockService: appLockService,
+                          categoryService: categoryService,
+                          mediaRecoveryService: recoveryService,
+                          existingCard: card,
+                        ),
                       ),
                     ),
-                  ));
+                  );
                 },
               ),
             ],

@@ -698,17 +698,19 @@ class _EditCardScreenState extends State<EditCardScreen> {
         builder: (context) => _ScanDuplicateDialog(card: existingDuplicate),
       );
       if (decision == _ScanDuplicateDecision.openExisting && mounted) {
-        unawaited(Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => EditCardScreen(
-              repository: widget.repository,
-              appLockService: widget.appLockService,
-              categoryService: widget.categoryService,
-              mediaRecoveryService: widget.mediaRecoveryService,
-              existingCard: existingDuplicate,
+        unawaited(
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => EditCardScreen(
+                repository: widget.repository,
+                appLockService: widget.appLockService,
+                categoryService: widget.categoryService,
+                mediaRecoveryService: widget.mediaRecoveryService,
+                existingCard: existingDuplicate,
+              ),
             ),
           ),
-        ));
+        );
         return;
       }
     }
