@@ -104,7 +104,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
     _draftCardId =
         widget.recoveredMediaDraft?.draftCardId ??
         card?.id ??
-        WalletCard.generateNewId(prefix: 'draft');
+        WalletCard.generateNewId();
     if (card == null) {
       _applyPreset();
       _applyRecoveredMediaDraft();
@@ -203,62 +203,16 @@ class _EditCardScreenState extends State<EditCardScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: _cardType == CardType.visitingCard
-                    ? 'Person name'
-                    : 'Card name',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return _cardType == CardType.visitingCard
-                      ? 'Enter a person name'
-                      : 'Enter a card name';
-                }
-                return null;
-              },
+            _CardIdentityFields(
+              cardType: _cardType,
+              nameController: _nameController,
+              issuerController: _issuerController,
+              customCategoryController: _customCategoryController,
+              category: _category,
+              selectedCategoryKey: _selectedCategoryKey,
+              categoryEntriesBuilder: _categoryEntries,
+              onCategorySelected: _handleCategorySelected,
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _issuerController,
-              decoration: InputDecoration(
-                labelText: _cardType == CardType.visitingCard
-                    ? 'Company'
-                    : 'Issuer',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedCategoryKey,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(),
-              ),
-              items: _categoryEntries(),
-              onChanged: _handleCategorySelected,
-            ),
-            if (_category == CardCategory.other) ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _customCategoryController,
-                decoration: const InputDecoration(
-                  labelText: 'Custom category',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (_category != CardCategory.other) {
-                    return null;
-                  }
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Enter a custom category';
-                  }
-                  return null;
-                },
-              ),
-            ],
             const SizedBox(height: 18),
             _PermissionNote(
               icon: Icons.photo_camera,
@@ -298,145 +252,32 @@ class _EditCardScreenState extends State<EditCardScreen> {
             ),
             if (_cardType == CardType.visitingCard) ...[
               const SizedBox(height: 18),
-              _PermissionNote(
-                icon: Icons.manage_search,
-                text:
-                    'Use Extract details after adding at least the front image. Card Box will suggest contact fields, and you decide what to keep.',
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.icon(
-                  onPressed: _canExtractDetails
-                      ? _extractVisitingCardDetails
-                      : null,
-                  icon: Icon(
-                    _extractingDetails
-                        ? Icons.hourglass_top
-                        : Icons.auto_awesome,
-                  ),
-                  label: Text(
-                    _extractingDetails ? 'Extracting...' : 'Extract details',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _contactTitleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _contactPhonesController,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Phone numbers',
-                  helperText: 'One phone number per line',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _contactEmailsController,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Emails',
-                  helperText: 'One email per line',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _contactWebsitesController,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Websites',
-                  helperText: 'One website per line',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _contactAddressController,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  border: OutlineInputBorder(),
-                ),
+              _VisitingCardFields(
+                titleController: _contactTitleController,
+                phonesController: _contactPhonesController,
+                emailsController: _contactEmailsController,
+                websitesController: _contactWebsitesController,
+                addressController: _contactAddressController,
+                canExtractDetails: _canExtractDetails,
+                extractingDetails: _extractingDetails,
+                onExtractPressed: _extractVisitingCardDetails,
               ),
             ],
             if (_cardType != CardType.visitingCard) ...[
               const SizedBox(height: 18),
-              _PermissionNote(
-                icon: Icons.qr_code_scanner,
-                text:
-                    'Barcode and QR scanning asks before using the camera. Manual entry still works when scanning is not practical.',
+              _BarcodeFields(
+                payloadController: _barcodePayloadController,
+                formatController: _barcodeFormatController,
+                onScanPressed: _startBarcodeScanFlow,
+                hasStoredCodeMetadata: _hasStoredCodeMetadata,
+                displayValue: _barcodeDisplayValue,
+                valueType: _barcodeValueType,
+                structuredData: _barcodeStructuredData,
+                rawBytesHex: _barcodeRawBytesHex,
+                capturedAt: _barcodeCapturedAt,
+                imagePath: _barcodeImagePath,
+                humanizeValueType: _humanizeBarcodeValueType,
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.icon(
-                  onPressed: _startBarcodeScanFlow,
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Scan code'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _barcodePayloadController,
-                decoration: const InputDecoration(
-                  labelText: 'Barcode/QR payload',
-                  helperText:
-                      'A card can keep this visible code together with photos and NFC details.',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _barcodeFormatController,
-                decoration: const InputDecoration(
-                  labelText: 'Barcode/QR format',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              if (_hasStoredCodeMetadata) ...[
-                const SizedBox(height: 12),
-                _MetadataHintCard(
-                  title: 'Stored code details',
-                  lines: [
-                    if (_barcodeDisplayValue.trim().isNotEmpty)
-                      'Display value: ${_barcodeDisplayValue.trim()}',
-                    if (_barcodeValueType.trim().isNotEmpty)
-                      'Detected type: ${_humanizeBarcodeValueType(_barcodeValueType)}',
-                    if (_barcodeStructuredData.trim().isNotEmpty)
-                      'Structured details captured',
-                    if (_barcodeRawBytesHex.trim().isNotEmpty)
-                      'Raw bytes captured',
-                    if (_barcodeCapturedAt != null)
-                      'Scanned: ${_barcodeCapturedAt!.toLocal()}',
-                  ],
-                ),
-                if (_barcodeImagePath.trim().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _PhotoEditor(
-                    title: 'Stored code image',
-                    imagePath: _barcodeImagePath,
-                    busy: false,
-                    onScan: null,
-                    onCapture: null,
-                    onLibrary: null,
-                    onEdit: null,
-                    onClear: null,
-                  ),
-                ],
-              ],
             ],
             const SizedBox(height: 12),
             TextFormField(
@@ -470,34 +311,9 @@ class _EditCardScreenState extends State<EditCardScreen> {
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-        final tokens = CardBoxThemeTokens.of(context);
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              tokens.spaceLarge,
-              0,
-              tokens.spaceLarge,
-              tokens.spaceXLarge,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  editing ? 'How this card flow works' : 'How to add this card',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: tokens.spaceSmall),
-                Text(
-                  'Use this as a quick guide, then come back here and keep moving.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                SizedBox(height: tokens.spaceLarge),
-                _AddFlowGuide(preset: widget.preset, framed: false),
-              ],
-            ),
-          ),
+        return _AddHelpSheetContent(
+          preset: widget.preset,
+          editing: editing,
         );
       },
     );
@@ -526,22 +342,7 @@ class _EditCardScreenState extends State<EditCardScreen> {
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete permanently?'),
-        content: Text(
-          '${card.name} and its saved images will be removed from this device.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      builder: (context) => _ConfirmDeleteDialog(cardName: card.name),
     );
     if (confirmed != true) {
       return;
@@ -881,6 +682,39 @@ class _EditCardScreenState extends State<EditCardScreen> {
       return;
     }
     final scannedCode = result;
+    // Scan-time duplicate detection. If the same payload is already
+    // on a non-archived card (and it's not the card we're editing),
+    // ask the user whether to keep the new scan or open the existing
+    // card instead. This is opt-out: declining means the scanned code
+    // is treated as a fresh one-off (e.g. for a card that doesn't
+    // store the payload, or because the user genuinely wants a new
+    // entry with the same code).
+    final existingDuplicate = widget.existingCard == null ||
+            widget.existingCard!.barcodePayload.trim() !=
+                scannedCode.payload.trim()
+        ? widget.repository.findByBarcodePayload(scannedCode.payload)
+        : null;
+    if (existingDuplicate != null && mounted) {
+      final decision = await showDialog<_ScanDuplicateDecision>(
+        context: context,
+        builder: (context) => _ScanDuplicateDialog(card: existingDuplicate),
+      );
+      if (decision == _ScanDuplicateDecision.openExisting && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => EditCardScreen(
+              repository: widget.repository,
+              appLockService: widget.appLockService,
+              categoryService: widget.categoryService,
+              mediaRecoveryService: widget.mediaRecoveryService,
+              existingCard: existingDuplicate,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     final previousBarcodeImagePath = _barcodeImagePath;
     var nextBarcodeImagePath = '';
     if (scannedCode.imageBytes != null && scannedCode.imageBytes!.isNotEmpty) {
@@ -994,19 +828,10 @@ class _EditCardScreenState extends State<EditCardScreen> {
   }) async {
     final decision = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(actionLabel),
-          ),
-        ],
+      builder: (context) => _InterfaceConfirmDialog(
+        title: title,
+        message: message,
+        actionLabel: actionLabel,
       ),
     );
     return decision ?? false;
@@ -1559,6 +1384,440 @@ class _PhotoEditor extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Body of the "How to add this card" / "How this card flow works"
+/// modal bottom sheet. Renders a short header and the same
+/// [_AddFlowGuide] used inline on the form.
+class _AddHelpSheetContent extends StatelessWidget {
+  const _AddHelpSheetContent({required this.preset, required this.editing});
+
+  final AddCardPreset preset;
+  final bool editing;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          tokens.spaceLarge,
+          0,
+          tokens.spaceLarge,
+          tokens.spaceXLarge,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              editing ? 'How this card flow works' : 'How to add this card',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: tokens.spaceSmall),
+            Text(
+              'Use this as a quick guide, then come back here and keep moving.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            SizedBox(height: tokens.spaceLarge),
+            _AddFlowGuide(preset: preset, framed: false),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Confirmation dialog used by `_confirmInterfaceUse` and its three
+/// call sites. Pure render of the title, message, and action label.
+class _InterfaceConfirmDialog extends StatelessWidget {
+  const _InterfaceConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.actionLabel,
+  });
+
+  final String title;
+  final String message;
+  final String actionLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(actionLabel),
+        ),
+      ],
+    );
+  }
+}
+
+/// Confirmation dialog shown when deleting a saved card. Pure render
+/// of the card name in the message body.
+class _ConfirmDeleteDialog extends StatelessWidget {
+  const _ConfirmDeleteDialog({required this.cardName});
+
+  final String cardName;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Delete permanently?'),
+      content: Text(
+        '$cardName and its saved images will be removed from this device.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Top-of-form identity section: name, issuer, category dropdown, and
+/// the conditional custom-category field. All controllers are owned by
+/// the parent state. The category entries builder is a callback so the
+/// parent can keep its `_categoryEntries()` method private.
+class _CardIdentityFields extends StatelessWidget {
+  const _CardIdentityFields({
+    required this.cardType,
+    required this.nameController,
+    required this.issuerController,
+    required this.customCategoryController,
+    required this.category,
+    required this.selectedCategoryKey,
+    required this.categoryEntriesBuilder,
+    required this.onCategorySelected,
+  });
+
+  final CardType cardType;
+  final TextEditingController nameController;
+  final TextEditingController issuerController;
+  final TextEditingController customCategoryController;
+  final CardCategory category;
+  final String selectedCategoryKey;
+  final List<DropdownMenuItem<String>> Function() categoryEntriesBuilder;
+  final ValueChanged<String?> onCategorySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          controller: nameController,
+          decoration: InputDecoration(
+            labelText: cardType == CardType.visitingCard
+                ? 'Person name'
+                : 'Card name',
+            border: const OutlineInputBorder(),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return cardType == CardType.visitingCard
+                  ? 'Enter a person name'
+                  : 'Enter a card name';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: issuerController,
+          decoration: InputDecoration(
+            labelText: cardType == CardType.visitingCard
+                ? 'Company'
+                : 'Issuer',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: selectedCategoryKey,
+          decoration: const InputDecoration(
+            labelText: 'Category',
+            border: OutlineInputBorder(),
+          ),
+          items: categoryEntriesBuilder(),
+          onChanged: onCategorySelected,
+        ),
+        if (category == CardCategory.other) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: customCategoryController,
+            decoration: const InputDecoration(
+              labelText: 'Custom category',
+              border: OutlineInputBorder(),
+            ),
+            validator: (value) {
+              if (category != CardCategory.other) {
+                return null;
+              }
+              if (value == null || value.trim().isEmpty) {
+                return 'Enter a custom category';
+              }
+              return null;
+            },
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Visiting-card-specific contact fields plus the "Extract details"
+/// button that runs OCR on the front image.
+class _VisitingCardFields extends StatelessWidget {
+  const _VisitingCardFields({
+    required this.titleController,
+    required this.phonesController,
+    required this.emailsController,
+    required this.websitesController,
+    required this.addressController,
+    required this.canExtractDetails,
+    required this.extractingDetails,
+    required this.onExtractPressed,
+  });
+
+  final TextEditingController titleController;
+  final TextEditingController phonesController;
+  final TextEditingController emailsController;
+  final TextEditingController websitesController;
+  final TextEditingController addressController;
+  final bool canExtractDetails;
+  final bool extractingDetails;
+  final VoidCallback onExtractPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PermissionNote(
+          icon: Icons.manage_search,
+          text:
+              'Use Extract details after adding at least the front image. Card Box will suggest contact fields, and you decide what to keep.',
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: canExtractDetails ? onExtractPressed : null,
+            icon: Icon(
+              extractingDetails ? Icons.hourglass_top : Icons.auto_awesome,
+            ),
+            label: Text(extractingDetails ? 'Extracting...' : 'Extract details'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: titleController,
+          decoration: const InputDecoration(
+            labelText: 'Title',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: phonesController,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Phone numbers',
+            helperText: 'One phone number per line',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: emailsController,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Emails',
+            helperText: 'One email per line',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: websitesController,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Websites',
+            helperText: 'One website per line',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: addressController,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Address',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Barcode and QR section: scan button, payload/format text fields,
+/// and a stored-code hint card when metadata is present. The
+/// `humanizeValueType` callback is the parent's `_humanizeBarcodeValueType`
+/// method.
+class _BarcodeFields extends StatelessWidget {
+  const _BarcodeFields({
+    required this.payloadController,
+    required this.formatController,
+    required this.onScanPressed,
+    required this.hasStoredCodeMetadata,
+    required this.displayValue,
+    required this.valueType,
+    required this.structuredData,
+    required this.rawBytesHex,
+    required this.capturedAt,
+    required this.imagePath,
+    required this.humanizeValueType,
+  });
+
+  final TextEditingController payloadController;
+  final TextEditingController formatController;
+  final VoidCallback onScanPressed;
+  final bool hasStoredCodeMetadata;
+  final String displayValue;
+  final String valueType;
+  final String structuredData;
+  final String rawBytesHex;
+  final DateTime? capturedAt;
+  final String imagePath;
+  final String Function(String) humanizeValueType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PermissionNote(
+          icon: Icons.qr_code_scanner,
+          text:
+              'Barcode and QR scanning asks before using the camera. Manual entry still works when scanning is not practical.',
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: onScanPressed,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('Scan code'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: payloadController,
+          decoration: const InputDecoration(
+            labelText: 'Barcode/QR payload',
+            helperText:
+                'A card can keep this visible code together with photos and NFC details.',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: formatController,
+          decoration: const InputDecoration(
+            labelText: 'Barcode/QR format',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        if (hasStoredCodeMetadata) ...[
+          const SizedBox(height: 12),
+          _MetadataHintCard(
+            title: 'Stored code details',
+            lines: [
+              if (displayValue.trim().isNotEmpty)
+                'Display value: ${displayValue.trim()}',
+              if (valueType.trim().isNotEmpty)
+                'Detected type: ${humanizeValueType(valueType)}',
+              if (structuredData.trim().isNotEmpty)
+                'Structured details captured',
+              if (rawBytesHex.trim().isNotEmpty)
+                'Raw bytes captured',
+              if (capturedAt != null)
+                'Scanned: ${capturedAt!.toLocal()}',
+            ],
+          ),
+          if (imagePath.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _PhotoEditor(
+              title: 'Stored code image',
+              imagePath: imagePath,
+              busy: false,
+              onScan: null,
+              onCapture: null,
+              onLibrary: null,
+              onEdit: null,
+              onClear: null,
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+/// Outcome the user can pick when a scanned code is already present on
+/// a saved card. "Keep scanning" means the scanned code is applied to
+/// the form as usual; "openExisting" means replace this screen with
+/// the EditCardScreen for the existing card.
+enum _ScanDuplicateDecision { keepScanning, openExisting }
+
+class _ScanDuplicateDialog extends StatelessWidget {
+  const _ScanDuplicateDialog({required this.card});
+
+  final WalletCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Already on a saved card'),
+      content: Text(
+        'This code is already on "${card.name}". Open the existing card, or keep the new scan and add it here?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            _ScanDuplicateDecision.keepScanning,
+          ),
+          child: const Text('Keep new scan'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(
+            _ScanDuplicateDecision.openExisting,
+          ),
+          child: const Text('Open existing'),
+        ),
+      ],
     );
   }
 }

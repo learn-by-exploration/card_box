@@ -14,7 +14,6 @@ class WalletCard {
     required this.updatedAt,
     this.issuer = '',
     this.notes = '',
-    this.expiryDate,
     this.favorite = false,
     this.archived = false,
     this.frontImagePath = '',
@@ -37,6 +36,8 @@ class WalletCard {
     this.contactWebsites = const <String>[],
     this.contactAddress = '',
     this.customCategory,
+    this.lastUsedAt,
+    this.useCount = 0,
   });
 
   final String id;
@@ -45,7 +46,6 @@ class WalletCard {
   final CardCategory category;
   final String? customCategory;
   final String notes;
-  final DateTime? expiryDate;
   final bool favorite;
   final bool archived;
   final String frontImagePath;
@@ -69,6 +69,8 @@ class WalletCard {
   final String contactAddress;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? lastUsedAt;
+  final int useCount;
 
   String get categoryLabel {
     if (category == CardCategory.other &&
@@ -106,8 +108,6 @@ class WalletCard {
     String? customCategory,
     bool clearCustomCategory = false,
     String? notes,
-    DateTime? expiryDate,
-    bool clearExpiryDate = false,
     bool? favorite,
     bool? archived,
     String? frontImagePath,
@@ -132,6 +132,9 @@ class WalletCard {
     String? contactAddress,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? lastUsedAt,
+    bool clearLastUsedAt = false,
+    int? useCount,
   }) {
     return WalletCard(
       id: id ?? this.id,
@@ -142,7 +145,6 @@ class WalletCard {
           ? null
           : customCategory ?? this.customCategory,
       notes: notes ?? this.notes,
-      expiryDate: clearExpiryDate ? null : expiryDate ?? this.expiryDate,
       favorite: favorite ?? this.favorite,
       archived: archived ?? this.archived,
       frontImagePath: frontImagePath ?? this.frontImagePath,
@@ -169,6 +171,10 @@ class WalletCard {
       contactAddress: contactAddress ?? this.contactAddress,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastUsedAt: clearLastUsedAt
+          ? null
+          : lastUsedAt ?? this.lastUsedAt,
+      useCount: useCount ?? this.useCount,
     );
   }
 
@@ -180,7 +186,6 @@ class WalletCard {
       'category': category.name,
       'customCategory': customCategory,
       'notes': notes,
-      'expiryDate': expiryDate?.toIso8601String(),
       'favorite': favorite,
       'archived': archived,
       'frontImagePath': frontImagePath,
@@ -204,6 +209,8 @@ class WalletCard {
       'contactAddress': contactAddress,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'lastUsedAt': lastUsedAt?.toIso8601String(),
+      'useCount': useCount,
     };
   }
 
@@ -218,7 +225,6 @@ class WalletCard {
       category: CardCategory.fromName(json['category'] as String? ?? ''),
       customCategory: json['customCategory'] as String?,
       notes: json['notes'] as String? ?? '',
-      expiryDate: _parseDate(json['expiryDate']),
       favorite: json['favorite'] as bool? ?? false,
       archived: json['archived'] as bool? ?? false,
       frontImagePath: json['frontImagePath'] as String? ?? '',
@@ -244,6 +250,8 @@ class WalletCard {
       contactAddress: json['contactAddress'] as String? ?? '',
       createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updatedAt']) ?? DateTime.now(),
+      lastUsedAt: _parseDate(json['lastUsedAt']),
+      useCount: json['useCount'] as int? ?? 0,
     );
   }
 
@@ -274,10 +282,10 @@ class WalletCard {
   /// a simulator with frozen clocks) cannot collide. The random
   /// source is intentionally process-local; ids do not need to
   /// be cryptographically unguessable.
-  static String generateNewId({String prefix = 'card'}) {
+  static String generateNewId() {
     final micros = DateTime.now().microsecondsSinceEpoch;
     final suffix = _idRandom.nextInt(1 << 32).toRadixString(16).padLeft(8, '0');
-    return '$prefix-$micros-$suffix';
+    return 'card-$micros-$suffix';
   }
 
   static final math.Random _idRandom = math.Random.secure();

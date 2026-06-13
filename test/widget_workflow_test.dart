@@ -187,7 +187,11 @@ void main() {
       tester,
     ) async {
       // Use a small viewport so the bottom actions fall below the fold.
-      await tester.binding.setSurfaceSize(const Size(360, 540));
+      // The section label area (category chip, sort button, count) makes
+      // the home page a bit taller than it used to be, so the card tile
+      // sits lower; 540 was barely enough before, 640 keeps it tappable
+      // and still small enough to force the sheet to scroll.
+      await tester.binding.setSurfaceSize(const Size(360, 640));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();

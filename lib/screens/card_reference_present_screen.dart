@@ -1,13 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:card_box/models/wallet_card.dart';
 import 'package:card_box/theme.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
 
 class CardReferencePresentScreen extends StatefulWidget {
-  const CardReferencePresentScreen({super.key, required this.card});
+  const CardReferencePresentScreen({
+    super.key,
+    required this.card,
+    this.onShown,
+  });
 
   final WalletCard card;
+  /// Optional callback fired once when the screen first renders.
+  /// Used to record that the card was used (marking lastUsedAt and
+  /// useCount). The returned future is awaited inside the post-frame
+  /// callback so a thrown error is observed by the caller, not
+  /// silently swallowed. Callers without a repository can leave
+  /// this null.
+  final Future<void> Function()? onShown;
 
   @override
   State<CardReferencePresentScreen> createState() =>
@@ -19,6 +33,8 @@ class _CardReferencePresentScreenState
   late final PageController _pageController;
   late final List<_ReferencePage> _pages;
   int _currentPage = 0;
+  bool _wakelockAcquired = false;
+  bool _onShownFired = false;
 
   @override
   void initState() {
@@ -30,10 +46,43 @@ class _CardReferencePresentScreenState
         _ReferencePage(label: 'Back', imagePath: widget.card.backImagePath),
     ];
     _pageController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (!_wakelockAcquired) {
+        // The plugin is idempotent, but we still gate the call so a
+        // hot-reload re-entry into initState does not double-acquire.
+        _wakelockAcquired = true;
+        try {
+          await WakelockPlus.enable();
+        } catch (error) {
+          debugPrint('CardReferencePresentScreen: WakelockPlus.enable failed: $error');
+          _wakelockAcquired = false;
+        }
+      }
+      if (!mounted) return;
+      final callback = widget.onShown;
+      if (callback != null && !_onShownFired) {
+        _onShownFired = true;
+        try {
+          await callback();
+        } catch (error) {
+          debugPrint('CardReferencePresentScreen: onShown callback failed: $error');
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    if (_wakelockAcquired) {
+      _wakelockAcquired = false;
+      // Best-effort: a stuck wakelock is auto-cleared on Android when
+      // the Activity is destroyed, but on iOS the idleTimerDisabled
+      // flag would otherwise outlive this screen.
+      unawaited(WakelockPlus.disable().catchError((Object error) {
+        debugPrint('CardReferencePresentScreen: WakelockPlus.disable failed: $error');
+      }));
+    }
     _pageController.dispose();
     super.dispose();
   }

@@ -120,3 +120,80 @@ Stabilization work followed the plan in `docs/STABILIZATION_PLAN.md`.
 - This changelog.
 - `MIGRATION.md` documents the v1 → v2 schema upgrade and the
   legacy `shared_preferences` → SQLite migration.
+
+### Phase 7 — Dead-code purge
+
+- `WalletCard.expiryDate` is removed. The field was introduced for
+  expiry reminders, which are deferred to a later pass (see
+  `docs/v_model/decision_record.md` DR-013).
+- `WalletCard.generateNewId` no longer uses the `wallet-` prefix;
+  new ids are `card-<micros>-<hex>`. Existing backups still load
+  because the id is stored in the JSON payload.
+- The denormalized DB columns introduced for the deferred features
+  (including the unused `androidHceCandidate` field, which is
+  active today) have been removed from the Drift schema. The
+  storage of record is `(id, payloadJson, createdAtMillis,
+  updatedAtMillis)`.
+
+### Phase 8 — Screen refactor
+
+- `home_screen.dart` is split into `_HomeAppBar`,
+  `_CategoryFilterBar`, `_CategoryPickerSheet`, `_HelpSheetContent`,
+  and `_CardActionsSheet` so further feature work lands in
+  reviewable chunks.
+- `edit_card_screen.dart` is split into `_CardIdentityFields`,
+  `_VisitingCardFields`, `_BarcodeFields`, `_AddHelpSheetContent`,
+  `_InterfaceConfirmDialog`, `_ConfirmDeleteDialog`, and a
+  `_ScanDuplicateDialog` (used by the new scan-time duplicate
+  detection).
+
+### Phase 9 — User-facing features
+
+- **Duplicate card.** A new "Duplicate" action on the more-options
+  sheet creates a peer card with a fresh id, the name suffixed with
+  "(copy)", and new `createdAt`/`updatedAt` timestamps.
+- **Sort options.** The home list can be sorted by name (A→Z,
+  default), name (Z→A), most recently updated, or most recently
+  added. The selection persists in `SharedPreferences`.
+- **Favorites filter.** A one-tap chip on the home list hides every
+  non-favorited card and composes with the category and free-text
+  filters.
+- **Scan-time duplicate detection.** Scanning a barcode whose
+  payload already exists on a different card surfaces a one-tap
+  prompt to jump to the existing card or keep scanning. Re-scanning
+  the same card's own payload does not self-prompt.
+- **Wakelock on presentation screens.** The present-code and
+  present-card screens now hold a `WakelockPlus` enable for their
+  lifetime and release it in `dispose`, so the phone does not dim
+  mid-scan.
+- **Last-used and use count.** The presentation screens fire an
+  `onShown` callback that the caller wires to
+  `CardRepository.markUsed`. The card's `lastUsedAt` and
+  `useCount` are persisted through the JSON payload (no schema
+  migration) and round-trip cleanly through export/import.
+
+### Deferred to a later pass
+
+- Expiry reminders and acceptance locations are formally deferred
+  to a later pass (DR-013 in `docs/v_model/decision_record.md`).
+  The data model and Drift schema do not reserve space for these
+  features.
+
+### Phase 10 — Review fixes
+
+- The present-code and present-card screens now type their
+  `onShown` prop as `Future<void> Function()?` instead of
+  `VoidCallback?`, so a thrown error in `markUsed` is observed
+  by the caller rather than silently swallowed.
+- The same screens now use `_wakelockAcquired` and `_onShownFired`
+  guards so a hot-reload re-entry into `initState` does not
+  double-acquire the wakelock or double-bump `useCount`. Errors
+  from the wakelock plugin and from the `onShown` callback are
+  logged via `debugPrint` instead of being dropped.
+- `duplicateCard` now resets `archived`, `favorite`, `lastUsedAt`,
+  and `useCount` on the copy. A duplicate of an archived card is
+  an active, un-favorited, un-used variant of the original.
+- The `markUsed is a no-op for an unknown card id` test now
+  asserts that the visible card list is unchanged, so a future
+  regression that synthesized a card for an unknown id would be
+  caught.

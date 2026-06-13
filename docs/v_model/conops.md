@@ -1,6 +1,6 @@
 # Concept Of Operations
 
-Status: draft, created 2026-06-03.
+Status: active, last updated 2026-06-13.
 
 ## Mission
 
@@ -38,11 +38,12 @@ The app must work in ordinary day-to-day environments:
 
 | Mode | Description |
 | --- | --- |
-| Catalog mode | Add, edit, search, favorite, archive, and view card records |
-| Presentation mode | Show barcode/QR or card image clearly for external scanning |
+| Catalog mode | Add, edit, search, favorite, archive, sort, and view card records |
+| Presentation mode | Show barcode/QR or card image clearly for external scanning; the screen is kept awake while the user is presenting, and the card's `lastUsedAt`/`useCount` are updated on entry |
 | Compatibility test mode | Determine whether the card is barcode/QR displayable, NFC readable, Android HCE candidate, reference-only, or unsupported |
 | Contact extraction mode | Capture a visiting card, extract candidate fields, and let the user review them before save |
 | Export/import mode | Let the user create and restore local backup files |
+| Reuse / organize mode | Sort, favorites filter, duplicate an existing card as a starting point for a variant |
 | Future secure mode | Protect app entry or sensitive cards with biometric/passcode lock |
 
 ## Default Card Categories
@@ -66,6 +67,37 @@ new real-world card types without redesigning the card model.
 10. User presents the barcode/QR, references the photo, opens structured
    contact details, or sees that the card
    remains physical-only.
+
+## Day-To-Day Reuse Patterns
+
+The home list and search screen are the primary entry points once a user has
+more than a handful of cards. The current prototype supports the following
+reuse patterns:
+
+- **Sort.** The home list can be sorted by name (A→Z, the default), name
+  (Z→A), most recently updated, or most recently added. The selection is
+  remembered across launches.
+- **Favorites filter.** A one-tap chip on the home list hides every
+  non-favorited card. It composes with the category filter and the
+  free-text search. Favorites continue to sort to the top of any active
+  sort.
+- **Duplicate.** The more-options sheet for a card offers a "Duplicate"
+  action that creates a peer card with the same fields and photos but a
+  fresh id, the name suffixed with "(copy)", and new timestamps. This is
+  the recommended way to spin up a slightly different variant of an
+  existing card (for example, a second loyalty account at the same
+  merchant) without re-entering all the data by hand.
+- **Scan-time duplicate detection.** When a user is adding or editing a
+  card and scans a barcode whose payload is already on another card, the
+  app shows a one-tap prompt: jump to the existing card, or keep scanning
+  a different code. This prevents the most common data-entry mistake
+  (creating a second card that secretly points to the same code).
+- **Presentation lock and use tracking.** When the user opens the
+  present-code or present-card screen for a card, the app keeps the
+  screen awake (via `wakelock_plus`) for the duration of the scan and
+  records a `lastUsedAt` timestamp plus an incrementing `useCount`. The
+  recent list on the home screen surfaces cards by recency, so frequently
+  used cards stay easy to find.
 
 ## Constraints
 

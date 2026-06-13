@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:card_box/models/add_card_preset.dart';
+import 'package:card_box/models/card_box_sort.dart';
 import 'package:card_box/models/card_category.dart';
 import 'package:card_box/models/compatibility_status.dart';
 import 'package:card_box/models/recovered_media_draft.dart';
@@ -60,11 +61,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _categoryKey;
   _BrowseMode _browseMode = _BrowseMode.cards;
   _CardLayoutMode _layoutMode = _CardLayoutMode.list;
+  CardBoxSort _sort = CardBoxSort.fallback;
+  bool _favoritesOnly = false;
 
   @override
   void initState() {
     super.initState();
     _loadLayoutPreference();
+    _loadSortPreference();
   }
 
   @override
@@ -84,80 +88,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ? 'Your cards'
             : 'Your contacts';
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Card Box'),
-            actions: [
-              IconButton(
-                tooltip: _layoutMode == _CardLayoutMode.list
-                    ? 'Use grid view'
-                    : 'Use list view',
-                icon: Icon(
-                  _layoutMode == _CardLayoutMode.list
-                      ? Icons.grid_view_outlined
-                      : Icons.view_agenda_outlined,
-                ),
-                onPressed: _toggleLayoutMode,
-              ),
-              PopupMenuButton<_HomeMenuAction>(
-                tooltip: 'More',
-                onSelected: _handleMenuAction,
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: _HomeMenuAction.archived,
-                    child: _PopupMenuItemRow(
-                      icon: Icons.archive_outlined,
-                      label: archivedCount == 0
-                          ? 'Archived cards'
-                          : 'Archived cards ($archivedCount)',
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _HomeMenuAction.summary,
-                    child: _PopupMenuItemRow(
-                      icon: Icons.space_dashboard_outlined,
-                      label: 'Wallet summary',
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _HomeMenuAction.theme,
-                    child: _PopupMenuItemRow(
-                      icon: Icons.palette_outlined,
-                      label: 'Theme',
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _HomeMenuAction.categories,
-                    child: _PopupMenuItemRow(
-                      icon: Icons.category_outlined,
-                      label: 'Categories',
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _HomeMenuAction.backup,
-                    child: _PopupMenuItemRow(
-                      icon: Icons.ios_share,
-                      label: 'Backup and import',
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: _HomeMenuAction.lock,
-                    child: _PopupMenuItemRow(
-                      icon: widget.appLockService.lockEnabled
-                          ? Icons.lock_outline
-                          : Icons.shield_outlined,
-                      label: 'App lock',
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _HomeMenuAction.help,
-                    child: _PopupMenuItemRow(
-                      icon: Icons.help_outline_rounded,
-                      label: 'How to add',
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          appBar: _HomeAppBar(
+            layoutMode: _layoutMode,
+            archivedCount: archivedCount,
+            lockEnabled: widget.appLockService.lockEnabled,
+            onToggleLayoutMode: _toggleLayoutMode,
+            onMenuAction: _handleMenuAction,
           ),
           body: SafeArea(
             child: ListView(
@@ -178,141 +114,73 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<_BrowseMode>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(
-                        value: _BrowseMode.cards,
-                        icon: Icon(Icons.wallet_membership_outlined),
-                        label: Text('Cards'),
-                      ),
-                      ButtonSegment(
-                        value: _BrowseMode.contacts,
-                        icon: Icon(Icons.contact_page_outlined),
-                        label: Text('Contacts'),
-                      ),
-                    ],
-                    selected: {_browseMode},
-                    onSelectionChanged: (selection) {
-                      setState(() {
-                        _browseMode = selection.first;
-                        if (_browseMode == _BrowseMode.contacts) {
-                          _categoryKey = null;
-                        }
-                      });
-                    },
-                  ),
+                _CategoryFilterBar(
+                  browseMode: _browseMode,
+                  categoryKey: _categoryKey,
+                  selectedCategoryLabel: _selectedCategoryLabel(allItems),
+                  onBrowseModeChanged: (mode) => setState(() {
+                    _browseMode = mode;
+                    if (_browseMode == _BrowseMode.contacts) {
+                      _categoryKey = null;
+                    }
+                  }),
+                  onOpenCategoryPicker: () => _openCategoryPicker(allItems),
+                  onClearCategory: () => setState(() => _categoryKey = null),
                 ),
                 const SizedBox(height: 16),
                 _SectionLabel(
                   title: browseLabel,
-                  trailing: Text(
-                    '${cards.length} shown',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FilterChip(
+                        avatar: Icon(
+                          _favoritesOnly
+                              ? Icons.star
+                              : Icons.star_border,
+                          size: 18,
+                          color: _favoritesOnly
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        label: const Text('Favorites'),
+                        selected: _favoritesOnly,
+                        onSelected: (value) =>
+                            setState(() => _favoritesOnly = value),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${cards.length} shown',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(width: 4),
+                      PopupMenuButton<CardBoxSort>(
+                        tooltip: 'Sort',
+                        icon: const Icon(Icons.sort, size: 20),
+                        onSelected: _setSort,
+                        itemBuilder: (context) => [
+                          for (final option in CardBoxSort.values)
+                            PopupMenuItem<CardBoxSort>(
+                              value: option,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    option == _sort
+                                        ? Icons.check
+                                        : Icons.check_box_outline_blank,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(option.label),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (_browseMode == _BrowseMode.cards) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _openCategoryPicker(allItems),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: CardBoxThemeTokens.of(
-                                context,
-                              ).spaceMedium,
-                              vertical: CardBoxThemeTokens.of(
-                                context,
-                              ).spaceMedium,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                CardBoxThemeTokens.of(context).radiusMedium,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.tune_rounded,
-                                size: CardBoxThemeTokens.of(context).iconSmall,
-                              ),
-                              SizedBox(
-                                width:
-                                    CardBoxThemeTokens.of(context).spaceMedium -
-                                    2,
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Category',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.labelSmall,
-                                    ),
-                                    SizedBox(
-                                      height:
-                                          CardBoxThemeTokens.of(
-                                            context,
-                                          ).spaceXSmall /
-                                          2,
-                                    ),
-                                    Text(
-                                      _selectedCategoryLabel(allItems),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(
-                                width: CardBoxThemeTokens.of(
-                                  context,
-                                ).spaceSmall,
-                              ),
-                              const Icon(Icons.keyboard_arrow_down_rounded),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (_categoryKey != null) ...[
-                        const SizedBox(width: 10),
-                        ActionChip(
-                          avatar: const Icon(Icons.close, size: 16),
-                          label: const Text('Clear'),
-                          onPressed: () => setState(() => _categoryKey = null),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _categoryKey == null
-                        ? 'Showing every category.'
-                        : 'Showing only ${_selectedCategoryLabel(allItems)}.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                ] else ...[
-                  Text(
-                    'Keep visiting cards in their own space so your everyday wallet stays tidy.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                ],
                 if (cards.isEmpty)
                   _EmptyState(
                     onAddCard: _browseMode == _BrowseMode.cards
@@ -378,140 +246,24 @@ class _HomeScreenState extends State<HomeScreen> {
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
-        final tokens = CardBoxThemeTokens.of(context);
-        final isCards = _browseMode == _BrowseMode.cards;
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              tokens.spaceLarge,
-              0,
-              tokens.spaceLarge,
-              tokens.spaceXLarge,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isCards ? 'How to add a card' : 'How to add a contact',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: tokens.spaceSmall),
-                Text(
-                  isCards
-                      ? 'Pick the path that matches what you are holding. You can still edit everything afterward.'
-                      : 'Choose the fastest way to get a visiting card or contact saved, then tidy the details afterward.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                SizedBox(height: tokens.spaceLarge),
-                if (isCards) ...[
-                  const _HelpOptionRow(
-                    icon: Icons.qr_code_2,
-                    title: 'Barcode card',
-                    body:
-                        'Best for loyalty, library, membership, and gift cards with visible barcodes or QR codes.',
-                  ),
-                  const SizedBox(height: 12),
-                  const _HelpOptionRow(
-                    icon: Icons.nfc,
-                    title: 'NFC / RFID card',
-                    body:
-                        'Best for tap-style cards like access or transit. Save it first, then test what this phone can read.',
-                  ),
-                  const SizedBox(height: 12),
-                  const _HelpOptionRow(
-                    icon: Icons.contact_page_outlined,
-                    title: 'Visiting card',
-                    body:
-                        'Best for business cards. Scan the card, extract details, and review what should become a saved contact.',
-                  ),
-                  const SizedBox(height: 12),
-                  const _HelpOptionRow(
-                    icon: Icons.badge_outlined,
-                    title: 'Reference card',
-                    body:
-                        'Best when the phone cannot use the card directly and you mainly want front/back images plus notes.',
-                  ),
-                  const SizedBox(height: 12),
-                  const _HelpOptionRow(
-                    icon: Icons.add_card,
-                    title: 'General card',
-                    body:
-                        'Best when you are not sure yet. Start blank and add only the parts this card really needs.',
-                  ),
-                ] else ...[
-                  const _HelpOptionRow(
-                    icon: Icons.document_scanner_outlined,
-                    title: 'Scan visiting card',
-                    body:
-                        'Use this when the business card is in front of you and you want the fastest capture flow.',
-                  ),
-                  const SizedBox(height: 12),
-                  const _HelpOptionRow(
-                    icon: Icons.contact_page_outlined,
-                    title: 'Add contact manually',
-                    body:
-                        'Use this when you already know the details or only need a simple contact record first.',
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
+        return _HelpSheetContent(isCards: _browseMode == _BrowseMode.cards);
       },
     );
   }
 
   Future<void> _openCategoryPicker(List<WalletCard> cards) async {
     final options = _categoryFilterOptions(cards);
+    final allCategoriesCount =
+        cards.where((card) => !card.isVisitingCard).length;
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Filter by category',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Choose the kind of card you want to browse right now.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      _CategoryOptionTile(
-                        label: 'All categories',
-                        count: cards
-                            .where((card) => !card.isVisitingCard)
-                            .length,
-                        selected: _categoryKey == null,
-                        onTap: () =>
-                            Navigator.of(context).pop(_allCategoriesFilterKey),
-                      ),
-                      for (final option in options)
-                        _CategoryOptionTile(
-                          label: option.label,
-                          count: option.count,
-                          selected: _categoryKey == option.key,
-                          onTap: () => Navigator.of(context).pop(option.key),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return _CategoryPickerSheet(
+          options: options,
+          selectedKey: _categoryKey,
+          allCategoriesCount: allCategoriesCount,
+          allCategoriesKey: _allCategoriesFilterKey,
         );
       },
     );
@@ -543,6 +295,26 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _layoutMode = nextMode);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_layoutPreferenceKey, nextMode.name);
+  }
+
+  Future<void> _loadSortPreference() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _sort = CardBoxSort.fromPreferenceValue(
+        preferences.getString(CardBoxSort.preferenceKey),
+      );
+    });
+  }
+
+  Future<void> _setSort(CardBoxSort next) async {
+    if (_sort == next) return;
+    setState(() => _sort = next);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      CardBoxSort.preferenceKey,
+      next.preferenceValue,
+    );
   }
 
   Future<void> _openSearch() async {
@@ -674,200 +446,177 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) {
-        final maxHeight = MediaQuery.of(context).size.height * 0.82;
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'More options',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    card.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    card.issuer.isEmpty ? card.categoryLabel : card.issuer,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 16),
-                  Flexible(
-                    child: Scrollbar(
-                      thumbVisibility: true,
-                      child: ListView(
-                        shrinkWrap: true,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          if (card.hasBarcode)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.fullscreen),
-                              title: const Text('Show code'),
-                              subtitle: const Text(
-                                'Open the full-screen barcode or QR view',
-                              ),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                Navigator.of(this.context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        BarcodePresentScreen(card: card),
-                                  ),
-                                );
-                              },
-                            ),
-                          if (!card.hasBarcode && card.hasPhotos)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.credit_card),
-                              title: const Text('Show card'),
-                              subtitle: const Text(
-                                'Open the saved front and back images full screen',
-                              ),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                Navigator.of(this.context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        CardReferencePresentScreen(card: card),
-                                  ),
-                                );
-                              },
-                            ),
-                          if (card.isVisitingCard)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.qr_code_2_outlined),
-                              title: const Text('Show contact QR'),
-                              subtitle: const Text(
-                                'Share this contact by letting someone scan a QR code',
-                              ),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                Navigator.of(this.context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ContactQrScreen(card: card),
-                                  ),
-                                );
-                              },
-                            ),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.share_outlined),
-                            title: Text(
-                              card.isVisitingCard
-                                  ? 'Share contact'
-                                  : 'Share card',
-                            ),
-                            subtitle: Text(
-                              card.isVisitingCard
-                                  ? 'Share a contact file through any messenger'
-                                  : 'Share a card image or summary through any messenger',
-                            ),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              _shareCard(card);
-                            },
-                          ),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.edit_outlined),
-                            title: Text(
-                              card.isVisitingCard
-                                  ? 'Edit contact'
-                                  : 'Edit card',
-                            ),
-                            subtitle: Text(
-                              card.isVisitingCard
-                                  ? 'Update photos, extracted fields, and notes'
-                                  : 'Update details, photos, notes, or codes',
-                            ),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              Navigator.of(this.context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => EditCardScreen(
-                                    repository: widget.repository,
-                                    appLockService: widget.appLockService,
-                                    categoryService: widget.categoryService,
-                                    mediaRecoveryService:
-                                        widget.mediaRecoveryService,
-                                    existingCard: card,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.visibility_outlined),
-                            title: Text(
-                              card.isVisitingCard
-                                  ? 'View contact'
-                                  : 'View details',
-                            ),
-                            subtitle: Text(
-                              card.isVisitingCard
-                                  ? 'Open the full contact detail screen'
-                                  : 'Open the full card detail screen',
-                            ),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              Navigator.of(this.context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CardDetailScreen(
-                                    repository: widget.repository,
-                                    appLockService: widget.appLockService,
-                                    categoryService: widget.categoryService,
-                                    cardId: card.id,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          if (!card.hasBarcode && !card.isVisitingCard)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.nfc),
-                              title: const Text('Test NFC / RFID'),
-                              subtitle: const Text(
-                                'Check whether this phone can read the card',
-                              ),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                Navigator.of(this.context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => CompatibilityTestScreen(
-                                      repository: widget.repository,
-                                      appLockService: widget.appLockService,
-                                      card: card,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      builder: (sheetContext) {
+        return _CardActionsSheet(
+          card: card,
+          actions: _buildCardActionTiles(sheetContext, card),
         );
       },
     );
+  }
+
+  /// Builds the list of action tiles for the card-actions sheet. Each
+  /// tile pops the sheet and (for navigation actions) pushes a new
+  /// route from the state's own context, so the caller must pass the
+  /// sheet's context (used for the pop) and the state's context is
+  /// captured by closure as `context`.
+  List<Widget> _buildCardActionTiles(
+    BuildContext sheetContext,
+    WalletCard card,
+  ) {
+    return <Widget>[
+      if (card.hasBarcode)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.fullscreen),
+          title: const Text('Show code'),
+          subtitle: const Text(
+            'Open the full-screen barcode or QR view',
+          ),
+          onTap: () {
+            Navigator.of(sheetContext).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => BarcodePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id)),
+              ),
+            );
+          },
+        ),
+      if (!card.hasBarcode && card.hasPhotos)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.credit_card),
+          title: const Text('Show card'),
+          subtitle: const Text(
+            'Open the saved front and back images full screen',
+          ),
+          onTap: () {
+            Navigator.of(sheetContext).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => CardReferencePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id)),
+              ),
+            );
+          },
+        ),
+      if (card.isVisitingCard)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.qr_code_2_outlined),
+          title: const Text('Show contact QR'),
+          subtitle: const Text(
+            'Share this contact by letting someone scan a QR code',
+          ),
+          onTap: () {
+            Navigator.of(sheetContext).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ContactQrScreen(card: card),
+              ),
+            );
+          },
+        ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.share_outlined),
+        title: Text(
+          card.isVisitingCard ? 'Share contact' : 'Share card',
+        ),
+        subtitle: Text(
+          card.isVisitingCard
+              ? 'Share a contact file through any messenger'
+              : 'Share a card image or summary through any messenger',
+        ),
+        onTap: () {
+          Navigator.of(sheetContext).pop();
+          _shareCard(card);
+        },
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.copy_all_outlined),
+        title: const Text('Duplicate'),
+        subtitle: const Text(
+          'Save a copy you can change without touching the original',
+        ),
+        onTap: () async {
+          Navigator.of(sheetContext).pop();
+          await _duplicateCard(card);
+        },
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.edit_outlined),
+        title: Text(
+          card.isVisitingCard ? 'Edit contact' : 'Edit card',
+        ),
+        subtitle: Text(
+          card.isVisitingCard
+              ? 'Update photos, extracted fields, and notes'
+              : 'Update details, photos, notes, or codes',
+        ),
+        onTap: () {
+          Navigator.of(sheetContext).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EditCardScreen(
+                repository: widget.repository,
+                appLockService: widget.appLockService,
+                categoryService: widget.categoryService,
+                mediaRecoveryService: widget.mediaRecoveryService,
+                existingCard: card,
+              ),
+            ),
+          );
+        },
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.visibility_outlined),
+        title: Text(
+          card.isVisitingCard ? 'View contact' : 'View details',
+        ),
+        subtitle: Text(
+          card.isVisitingCard
+              ? 'Open the full contact detail screen'
+              : 'Open the full card detail screen',
+        ),
+        onTap: () {
+          Navigator.of(sheetContext).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CardDetailScreen(
+                repository: widget.repository,
+                appLockService: widget.appLockService,
+                categoryService: widget.categoryService,
+                cardId: card.id,
+              ),
+            ),
+          );
+        },
+      ),
+      if (!card.hasBarcode && !card.isVisitingCard)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.nfc),
+          title: const Text('Test NFC / RFID'),
+          subtitle: const Text(
+            'Check whether this phone can read the card',
+          ),
+          onTap: () {
+            Navigator.of(sheetContext).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => CompatibilityTestScreen(
+                  repository: widget.repository,
+                  appLockService: widget.appLockService,
+                  card: card,
+                ),
+              ),
+            );
+          },
+        ),
+    ];
   }
 
   void _handleMenuAction(_HomeMenuAction action) {
@@ -930,18 +679,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final categoryMatches = _browseMode == _BrowseMode.contacts
           ? true
           : _matchesSelectedCategory(card);
-      return browseMatches && categoryMatches;
+      final favoritesMatch = _favoritesOnly ? card.favorite : true;
+      return browseMatches && categoryMatches && favoritesMatch;
     }).toList();
-    filtered.sort((a, b) {
-      if (a.favorite != b.favorite) {
-        return a.favorite ? -1 : 1;
-      }
-      if (_browseMode == _BrowseMode.cards && a.hasBarcode != b.hasBarcode) {
-        return a.hasBarcode ? -1 : 1;
-      }
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
-    return filtered;
+    // The user-picked sort is authoritative; the home screen used to
+    // bump favorites and barcode-cards ahead of alpha, but that
+    // behavior is now opt-in via the sort menu.
+    return applyCardSort(filtered, _sort);
   }
 
   bool _matchesSelectedCategory(WalletCard card) {
@@ -1054,12 +798,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _showCardCode(WalletCard card) async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card)));
+    ).push(MaterialPageRoute(builder: (_) => BarcodePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id))));
   }
 
   Future<void> _showCardImages(WalletCard card) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => CardReferencePresentScreen(card: card)),
+      MaterialPageRoute(builder: (_) => CardReferencePresentScreen(card: card, onShown: () => widget.repository.markUsed(card.id))),
     );
   }
 
@@ -1071,6 +815,34 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
+  Future<void> _duplicateCard(WalletCard card) async {
+    final copy = await widget.repository.duplicateCard(card.id);
+    if (!mounted || copy == null) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Duplicated as "${copy.name}".'),
+        action: SnackBarAction(
+          label: 'Edit copy',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => EditCardScreen(
+                  repository: widget.repository,
+                  appLockService: widget.appLockService,
+                  categoryService: widget.categoryService,
+                  mediaRecoveryService: widget.mediaRecoveryService,
+                  existingCard: copy,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -1621,6 +1393,458 @@ class _PopupMenuItemRow extends StatelessWidget {
           child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
       ],
+    );
+  }
+}
+
+/// Body of the "How to add" modal bottom sheet. Pure render of the same
+/// help text from a single bool prop; no state mutations.
+class _HelpSheetContent extends StatelessWidget {
+  const _HelpSheetContent({required this.isCards});
+
+  final bool isCards;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = CardBoxThemeTokens.of(context);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          tokens.spaceLarge,
+          0,
+          tokens.spaceLarge,
+          tokens.spaceXLarge,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isCards ? 'How to add a card' : 'How to add a contact',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: tokens.spaceSmall),
+            Text(
+              isCards
+                  ? 'Pick the path that matches what you are holding. You can still edit everything afterward.'
+                  : 'Choose the fastest way to get a visiting card or contact saved, then tidy the details afterward.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            SizedBox(height: tokens.spaceLarge),
+            if (isCards) ...[
+              const _HelpOptionRow(
+                icon: Icons.qr_code_2,
+                title: 'Barcode card',
+                body:
+                    'Best for loyalty, library, membership, and gift cards with visible barcodes or QR codes.',
+              ),
+              const SizedBox(height: 12),
+              const _HelpOptionRow(
+                icon: Icons.nfc,
+                title: 'NFC / RFID card',
+                body:
+                    'Best for tap-style cards like access or transit. Save it first, then test what this phone can read.',
+              ),
+              const SizedBox(height: 12),
+              const _HelpOptionRow(
+                icon: Icons.contact_page_outlined,
+                title: 'Visiting card',
+                body:
+                    'Best for business cards. Scan the card, extract details, and review what should become a saved contact.',
+              ),
+              const SizedBox(height: 12),
+              const _HelpOptionRow(
+                icon: Icons.badge_outlined,
+                title: 'Reference card',
+                body:
+                    'Best when the phone cannot use the card directly and you mainly want front/back images plus notes.',
+              ),
+              const SizedBox(height: 12),
+              const _HelpOptionRow(
+                icon: Icons.add_card,
+                title: 'General card',
+                body:
+                    'Best when you are not sure yet. Start blank and add only the parts this card really needs.',
+              ),
+            ] else ...[
+              const _HelpOptionRow(
+                icon: Icons.document_scanner_outlined,
+                title: 'Scan visiting card',
+                body:
+                    'Use this when the business card is in front of you and you want the fastest capture flow.',
+              ),
+              const SizedBox(height: 12),
+              const _HelpOptionRow(
+                icon: Icons.contact_page_outlined,
+                title: 'Add contact manually',
+                body:
+                    'Use this when you already know the details or only need a simple contact record first.',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Body of the "Filter by category" modal bottom sheet. The parent passes
+/// in the precomputed options and the current selection; tapping a tile
+/// pops the sheet with the chosen key.
+class _CategoryPickerSheet extends StatelessWidget {
+  const _CategoryPickerSheet({
+    required this.options,
+    required this.selectedKey,
+    required this.allCategoriesCount,
+    required this.allCategoriesKey,
+  });
+
+  final List<_CategoryFilterOption> options;
+  final String? selectedKey;
+  final int allCategoriesCount;
+  final String allCategoriesKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Filter by category',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Choose the kind of card you want to browse right now.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  _CategoryOptionTile(
+                    label: 'All categories',
+                    count: allCategoriesCount,
+                    selected: selectedKey == null,
+                    onTap: () => Navigator.of(context).pop(allCategoriesKey),
+                  ),
+                  for (final option in options)
+                    _CategoryOptionTile(
+                      label: option.label,
+                      count: option.count,
+                      selected: selectedKey == option.key,
+                      onTap: () => Navigator.of(context).pop(option.key),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// App bar for the home screen: a layout-mode toggle button (list/grid)
+/// and a "More" popup menu. Pure render of inputs — the parent owns
+/// all callbacks and the layout-mode / lock state.
+class _HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _HomeAppBar({
+    required this.layoutMode,
+    required this.archivedCount,
+    required this.lockEnabled,
+    required this.onToggleLayoutMode,
+    required this.onMenuAction,
+  });
+
+  final _CardLayoutMode layoutMode;
+  final int archivedCount;
+  final bool lockEnabled;
+  final VoidCallback onToggleLayoutMode;
+  final ValueChanged<_HomeMenuAction> onMenuAction;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      title: const Text('Card Box'),
+      actions: [
+        IconButton(
+          tooltip: layoutMode == _CardLayoutMode.list
+              ? 'Use grid view'
+              : 'Use list view',
+          icon: Icon(
+            layoutMode == _CardLayoutMode.list
+                ? Icons.grid_view_outlined
+                : Icons.view_agenda_outlined,
+          ),
+          onPressed: onToggleLayoutMode,
+        ),
+        PopupMenuButton<_HomeMenuAction>(
+          tooltip: 'More',
+          onSelected: onMenuAction,
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: _HomeMenuAction.archived,
+              child: _PopupMenuItemRow(
+                icon: Icons.archive_outlined,
+                label: archivedCount == 0
+                    ? 'Archived cards'
+                    : 'Archived cards ($archivedCount)',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _HomeMenuAction.summary,
+              child: _PopupMenuItemRow(
+                icon: Icons.space_dashboard_outlined,
+                label: 'Wallet summary',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _HomeMenuAction.theme,
+              child: _PopupMenuItemRow(
+                icon: Icons.palette_outlined,
+                label: 'Theme',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _HomeMenuAction.categories,
+              child: _PopupMenuItemRow(
+                icon: Icons.category_outlined,
+                label: 'Categories',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _HomeMenuAction.backup,
+              child: _PopupMenuItemRow(
+                icon: Icons.ios_share,
+                label: 'Backup and import',
+              ),
+            ),
+            PopupMenuItem(
+              value: _HomeMenuAction.lock,
+              child: _PopupMenuItemRow(
+                icon: lockEnabled
+                    ? Icons.lock_outline
+                    : Icons.shield_outlined,
+                label: 'App lock',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _HomeMenuAction.help,
+              child: _PopupMenuItemRow(
+                icon: Icons.help_outline_rounded,
+                label: 'How to add',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Browse-mode toggle + category chooser row + per-mode hint text. The
+/// parent owns all state; the widget only renders and propagates user
+/// intents back through callbacks.
+class _CategoryFilterBar extends StatelessWidget {
+  const _CategoryFilterBar({
+    required this.browseMode,
+    required this.categoryKey,
+    required this.selectedCategoryLabel,
+    required this.onBrowseModeChanged,
+    required this.onOpenCategoryPicker,
+    required this.onClearCategory,
+  });
+
+  final _BrowseMode browseMode;
+  final String? categoryKey;
+  final String selectedCategoryLabel;
+  final ValueChanged<_BrowseMode> onBrowseModeChanged;
+  final VoidCallback onOpenCategoryPicker;
+  final VoidCallback onClearCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<_BrowseMode>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: _BrowseMode.cards,
+                icon: Icon(Icons.wallet_membership_outlined),
+                label: Text('Cards'),
+              ),
+              ButtonSegment(
+                value: _BrowseMode.contacts,
+                icon: Icon(Icons.contact_page_outlined),
+                label: Text('Contacts'),
+              ),
+            ],
+            selected: {browseMode},
+            onSelectionChanged: (selection) => onBrowseModeChanged(
+              selection.first,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (browseMode == _BrowseMode.cards) ...[
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onOpenCategoryPicker,
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: CardBoxThemeTokens.of(context).spaceMedium,
+                      vertical: CardBoxThemeTokens.of(context).spaceMedium,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        CardBoxThemeTokens.of(context).radiusMedium,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.tune_rounded,
+                        size: CardBoxThemeTokens.of(context).iconSmall,
+                      ),
+                      SizedBox(
+                        width:
+                            CardBoxThemeTokens.of(context).spaceMedium - 2,
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Category',
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                            SizedBox(
+                              height: CardBoxThemeTokens.of(context).spaceXSmall /
+                                  2,
+                            ),
+                            Text(
+                              selectedCategoryLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: CardBoxThemeTokens.of(context).spaceSmall,
+                      ),
+                      const Icon(Icons.keyboard_arrow_down_rounded),
+                    ],
+                  ),
+                ),
+              ),
+              if (categoryKey != null) ...[
+                const SizedBox(width: 10),
+                ActionChip(
+                  avatar: const Icon(Icons.close, size: 16),
+                  label: const Text('Clear'),
+                  onPressed: onClearCategory,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            categoryKey == null
+                ? 'Showing every category.'
+                : 'Showing only $selectedCategoryLabel.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          Text(
+            'Keep visiting cards in their own space so your everyday wallet stays tidy.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+}
+
+/// Body of the card-actions modal bottom sheet. Renders the card's
+/// header (name, issuer, category) and a scrollable list of action
+/// tiles built by the parent. The list of tiles carries its own
+/// navigation callbacks — the sheet itself is a pure render.
+class _CardActionsSheet extends StatelessWidget {
+  const _CardActionsSheet({required this.card, required this.actions});
+
+  final WalletCard card;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.82;
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'More options',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                card.name,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                card.issuer.isEmpty ? card.categoryLabel : card.issuer,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: Scrollbar(
+                  thumbVisibility: true,
+                  child: ListView(
+                    shrinkWrap: true,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: actions,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

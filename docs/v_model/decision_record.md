@@ -238,3 +238,84 @@ Implication:
 - If a future platform integration needs the scanner's unrefined
   output (e.g. multi-page documents), the `photoTightener` argument
   can be swapped for a pass-through implementation at the call site.
+
+## DR-012: v0.1 Stabilization Pass (2026-06-13)
+
+Date: 2026-06-13
+
+Decision: The v0.1 prototype enters a stabilization pass that (a) removes
+the now-unused `expiryDate` field, the `generateNewId` "wallet-" prefix,
+and the denormalized DB columns introduced for the deferred features;
+(b) splits `home_screen.dart` and `edit_card_screen.dart` into smaller
+widgets so the next round of feature work is reviewable; and (c) lands
+six user-facing features: duplicate a card, sort options, favorites
+filter, scan-time duplicate detection, wakelock on the presentation
+screens, and per-card `lastUsedAt`/`useCount` tracking.
+
+Reasoning:
+
+- The drift schema is at v3 with `(id, payloadJson, createdAtMillis,
+  updatedAtMillis)` as the storage of record. The `expiryDate`, the
+  `androidHceCandidate` boolean, and several other denormalized columns
+  were introduced for capabilities that did not ship; keeping them
+  required either carrying dead code or running empty migrations on
+  every install.
+- The two largest screens had crossed 1500 lines each. Adding more
+  features on top of them was a poor trade between reviewability and
+  velocity.
+- The six landed features are all small, well-scoped, and round-trip
+  through the existing JSON payload. They do not require a schema bump
+  and they each have unit or widget tests.
+
+Implication:
+
+- `WalletCard.expiryDate` is gone. The acceptance-locations and
+  expiry-reminders features that originally motivated the field are
+  now deferred (see DR-013) and will be re-introduced deliberately
+  when they are built.
+- Card ids are now prefixed `card-…` (previously `wallet-…`). Existing
+  backups still load because the id is read from the payload, not
+  derived from the prefix.
+- The presentation screens are now `StatefulWidget`s so they can hold a
+  wakelock for their lifetime and fire an `onShown` callback. Callers
+  that need to record usage pass `onShown: () => repository.markUsed(id)`.
+- New tests cover the new behavior; the full suite (151 tests) is
+  green on the stabilization branch.
+
+## DR-013: Deferring Expiry Reminders And Acceptance Locations
+
+Date: 2026-06-13
+
+Decision: Expiry reminders and acceptance locations are explicitly
+deferred to a later pass. They are not on the v0.1 path.
+
+Reasoning:
+
+- Expiry reminders need a notification permission, a scheduled
+  notification service (`flutter_local_notifications` or equivalent),
+  a timezone-aware scheduling strategy, and an "expiring soon" UX on
+  top of the existing list. None of that is on the v0.1 critical path
+  and each piece adds platform surface that warrants its own
+  stabilization pass.
+- Acceptance locations need a geolocation permission, a background or
+  foreground location service, a per-card "where this card is
+  accepted" model, and a proximity search. The privacy story for a
+  local-first app that wants to do "which of my cards works here"
+  without sending coordinates anywhere is non-trivial and deserves a
+  dedicated decision record when it is designed.
+- Both features have clear "if we do it, do it well" requirements.
+  Building them as thin slivers now would lock the data model into a
+  shape that the better version would have to refactor.
+
+Implication:
+
+- The data model and Drift schema do not need to reserve space for
+  these features. The dead `expiryDate` field and the denormalized
+  columns it implied have been removed; they will be re-introduced,
+  if at all, by the feature that needs them.
+- The home list does not need an "expiring soon" filter, and the card
+  detail screen does not need a locations section. Their absence is
+  intentional, not a bug.
+- A future pass that picks up these features should write its own
+  decision record and update `implementation_status.md` and
+  `conops.md` in the same change.

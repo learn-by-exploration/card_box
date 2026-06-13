@@ -1,6 +1,6 @@
 # Implementation Status
 
-Status: v0.1 prototype started, updated 2026-06-11.
+Status: v0.1 prototype stabilization pass complete, updated 2026-06-13.
 
 ## Built
 
@@ -20,6 +20,8 @@ Status: v0.1 prototype started, updated 2026-06-11.
   - NFC summary
   - compatibility status
   - favorite/archive
+  - last-used timestamp and use count (set automatically when the
+    user opens the present-code or present-card screen)
 - Local repository using Drift / SQLite, with legacy `shared_preferences`
   migration support for older installs.
 - Demo seed cards are development-only via `--dart-define=CARD_BOX_SEED_DEMOS=true`.
@@ -55,6 +57,7 @@ Status: v0.1 prototype started, updated 2026-06-11.
   - add/edit card
   - compatibility test
   - export/import
+  - category settings (rename, merge into built-in categories)
 - Permission-first prototype messaging for camera, NFC, and file flows.
 - Native in-repo settings bridge for NFC settings handoff instead of relying on
   `app_settings`.
@@ -65,13 +68,38 @@ Status: v0.1 prototype started, updated 2026-06-11.
   aspect ratio (1.586:1). The tightener is fail-safe and never regresses
   the existing behavior. Applies to all smart-scan paths (Android ML Kit,
   iOS VisionKit, and the Android camera + ID-1 fallback).
+- Card organization and reuse improvements (added in the 2026-06-13
+  stabilization pass):
+  - Duplicate a card from the more-options sheet; the copy is created
+    locally with a new id, "(copy)" appended to the name, and fresh
+    `createdAt`/`updatedAt` timestamps. The duplicate is a peer of the
+    original and can be edited independently.
+  - Sort options on the home list: name A→Z (default), name Z→A, most
+    recently updated, most recently added. The last-used selection is
+    persisted across launches.
+  - Favorites filter on the home list: a one-tap filter chip that hides
+    every non-favorited card. The chip composes with the existing
+    category and free-text filters.
+  - Scan-time duplicate detection: while editing a card, scanning a
+    barcode whose payload already exists on a different card surfaces a
+    dialog ("This code is already on `X`") with options to keep scanning
+    or jump straight to the existing card. Re-scanning the same card's
+    own payload does not self-prompt.
+  - Wakelock on the present-code and present-card screens so the phone
+    does not dim mid-scan. The lock is released as soon as the user
+    leaves the screen.
+  - `markUsed` records the timestamp and bumps a per-card use counter
+    whenever the user opens the present-code or present-card screen.
+    `lastUsedAt` and `useCount` round-trip through the JSON payload, so
+    no schema migration is needed and existing backups upgrade
+    gracefully on import.
 
 ## Verified
 
 - `flutter pub get`
 - `dart format .`
 - `flutter analyze`
-- `flutter test`
+- `flutter test` (151 tests, all green as of 2026-06-13)
 - `flutter build apk --debug`
 - `flutter build apk --release`
 - `flutter build appbundle --release`
@@ -91,9 +119,17 @@ Status: v0.1 prototype started, updated 2026-06-11.
   requirement.
 - iOS Podfile now includes the Japanese ML Kit text-recognition package for the
   visiting-card OCR path.
+- `wakelock_plus 1.6.x` is the wakelock dependency used by the present
+  screens.
 
-## Not Yet Built
+## Deferred to a later pass
 
+- Expiry reminders. The data model does not yet track card expiry dates and
+  the app does not schedule notifications. The home list will not surface an
+  "expiring soon" chip until this is implemented.
+- Acceptance locations. The data model does not track per-card "where this
+  card is accepted" entries and the app does not request geolocation
+  permission or run a proximity search.
 - iOS NFC entitlement setup and validation.
 - Broader iOS-specific validation.
 - De-vendoring `mobile_scanner` and `nfc_manager` once upstream Android build

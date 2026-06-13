@@ -21,6 +21,14 @@ guided it.
   use cases are restricted by platform rules, cryptography, issuer systems, or
   law.
 
+## License
+
+Card Box is released under the [GNU Affero General Public License v3.0 or
+later](LICENSE) (AGPL-3.0). The AGPL was chosen because the app stores
+sensitive local data and may add a hosted service later; the
+source-disclosure clause keeps any network-facing derivative of the code
+under the same license.
+
 ## Documents
 
 - [V-model plan](docs/v_model/plan.md)

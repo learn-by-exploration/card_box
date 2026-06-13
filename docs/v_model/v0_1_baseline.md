@@ -1,6 +1,6 @@
 # v0.1 Requirements Baseline
 
-Status: draft baseline, created 2026-06-03.
+Status: active, created 2026-06-03, last reviewed 2026-06-13.
 
 ## Product Name
 
@@ -73,4 +73,14 @@ numbers:
 
 This baseline is ready to drive initial Flutter scaffolding and prototype
 implementation unless the user changes one of the product decisions above.
+
+## What Has Shipped Against This Baseline
+
+As of 2026-06-13 the prototype is past the scaffolding stage and the
+catalog, presentation, compatibility-test, contact-extraction, and
+export/import modes from the ConOps doc are all functional on Android
+(see `implementation_status.md` for the full inventory). Two capabilities
+called out in the ConOps as future work — expiry reminders and
+acceptance locations — have been formally deferred to a later pass;
+see `open_questions.md` for the rationale.
 

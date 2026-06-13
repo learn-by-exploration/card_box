@@ -201,6 +201,44 @@ class CardRepository extends ChangeNotifier {
     return null;
   }
 
+  /// Returns the first non-archived card whose barcode payload
+  /// matches [payload] exactly (case-insensitive, whitespace-trimmed).
+  /// Returns null if no match. Used for scan-time duplicate detection.
+  WalletCard? findByBarcodePayload(String payload) {
+    final needle = payload.trim().toLowerCase();
+    if (needle.isEmpty) return null;
+    for (final card in _cards) {
+      if (card.archived) continue;
+      if (card.barcodePayload.trim().toLowerCase() == needle) {
+        return card;
+      }
+    }
+    return null;
+  }
+
+  /// Records that a card was just used (presented for scanning or
+  /// shown to a cashier). Bumps [WalletCard.useCount] and stamps
+  /// [WalletCard.lastUsedAt] with the current time. No-op if the card
+  /// is unknown.
+  Future<void> markUsed(String id, {DateTime? at}) {
+    return _enqueue(() => _markUsedImpl(id, at: at));
+  }
+
+  Future<void> _markUsedImpl(String id, {DateTime? at}) async {
+    final card = findById(id);
+    if (card == null) {
+      return;
+    }
+    final stamp = at ?? DateTime.now();
+    await _upsertImpl(
+      card.copyWith(
+        lastUsedAt: stamp,
+        useCount: card.useCount + 1,
+        updatedAt: stamp,
+      ),
+    );
+  }
+
   Future<void> upsert(
     WalletCard card, {
     DateTime? updatedAt,
@@ -328,6 +366,38 @@ class CardRepository extends ChangeNotifier {
 
   Future<void> deleteCard(String id) {
     return _enqueue(() => _deleteCardImpl(id));
+  }
+
+  /// Duplicates an existing card with a fresh id and a `(copy)` suffix
+  /// on the name. The copy shares the original's media file paths
+  /// (we never read or write images here), starts un-archived and
+  /// un-favorited regardless of the source, and timestamps it as a
+  /// new just-created card. Returns null if [id] is not in the repo.
+  Future<WalletCard?> duplicateCard(String id) {
+    return _enqueue(() => _duplicateCardImpl(id));
+  }
+
+  Future<WalletCard?> _duplicateCardImpl(String id) async {
+    final original = findById(id);
+    if (original == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    final copy = original.copyWith(
+      id: WalletCard.generateNewId(),
+      name: '${original.name} (copy)',
+      createdAt: now,
+      updatedAt: now,
+      archived: false,
+      favorite: false,
+      // Reset usage telemetry so the duplicate is a fresh variant,
+      // not a re-skinned history of the original.
+      lastUsedAt: null,
+      clearLastUsedAt: true,
+      useCount: 0,
+    );
+    await _upsertImpl(copy);
+    return copy;
   }
 
   Future<void> _deleteCardImpl(String id) async {

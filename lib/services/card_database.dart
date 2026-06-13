@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_flutter/drift_flutter.dart';
-import 'package:flutter/foundation.dart';
 
 import 'package:card_box/models/wallet_card.dart';
 
@@ -13,26 +12,6 @@ class CardRecords extends Table {
   TextColumn get id => text()();
 
   TextColumn get payloadJson => text()();
-
-  TextColumn get nameText => text().withDefault(const Constant(''))();
-
-  TextColumn get issuerText => text().withDefault(const Constant(''))();
-
-  TextColumn get categoryName => text().withDefault(const Constant('other'))();
-
-  TextColumn get customCategoryText => text().nullable()();
-
-  TextColumn get cardTypeName =>
-      text().withDefault(const Constant('standard'))();
-
-  TextColumn get compatibilityStatusName =>
-      text().withDefault(const Constant('untested'))();
-
-  TextColumn get searchText => text().withDefault(const Constant(''))();
-
-  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
-
-  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
 
   IntColumn get createdAtMillis => integer()();
 
@@ -55,24 +34,73 @@ class CardDatabase extends _$CardDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
+
+  /// Raw DDL for the v1→v2 schema bump. The nine normalized columns
+  /// were never read by any code path and are dropped again in v3,
+  /// but v1 installs still need to traverse v2 on the way to v3 to
+  /// preserve any in-flight row data.
+  static const List<String> _v1ToV2AlterStatements = <String>[
+    "ALTER TABLE card_records ADD COLUMN name_text TEXT NOT NULL "
+    "DEFAULT ''",
+    "ALTER TABLE card_records ADD COLUMN issuer_text TEXT NOT NULL "
+    "DEFAULT ''",
+    "ALTER TABLE card_records ADD COLUMN category_name TEXT NOT NULL "
+    "DEFAULT 'other'",
+    'ALTER TABLE card_records ADD COLUMN custom_category_text TEXT',
+    "ALTER TABLE card_records ADD COLUMN card_type_name TEXT NOT NULL "
+    "DEFAULT 'standard'",
+    "ALTER TABLE card_records ADD COLUMN compatibility_status_name "
+    "TEXT NOT NULL DEFAULT 'untested'",
+    "ALTER TABLE card_records ADD COLUMN search_text TEXT NOT NULL "
+    "DEFAULT ''",
+    'ALTER TABLE card_records ADD COLUMN is_archived INTEGER NOT NULL '
+    'DEFAULT 0',
+    'ALTER TABLE card_records ADD COLUMN is_favorite INTEGER NOT NULL '
+    'DEFAULT 0',
+  ];
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) => migrator.createAll(),
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
-        await migrator.addColumn(cardRecords, cardRecords.nameText);
-        await migrator.addColumn(cardRecords, cardRecords.issuerText);
-        await migrator.addColumn(cardRecords, cardRecords.categoryName);
-        await migrator.addColumn(cardRecords, cardRecords.customCategoryText);
-        await migrator.addColumn(cardRecords, cardRecords.cardTypeName);
-        await migrator.addColumn(
-          cardRecords,
-          cardRecords.compatibilityStatusName,
-        );
-        await migrator.addColumn(cardRecords, cardRecords.searchText);
+        // v1 → v2: the v1 schema already had id, payload_json,
+        // created_at_millis, updated_at_millis. v2 added nine
+        // normalized columns (name_text, issuer_text, category_name,
+        // custom_category_text, card_type_name,
+        // compatibility_status_name, search_text, is_archived,
+        // is_favorite) that the v1→v2 migration populated via a
+        // per-row backfill. Those columns were never read by any
+        // code path: the repository always re-decodes payload_json
+        // into a WalletCard. v3 drops them again so the schema is
+        // the minimal storage-of-record.
+        //
+        // The columns are not on the v3 CardRecords class, so the
+        // ALTER TABLE statements are issued as raw SQL — drift's
+        // type-safe addColumn only sees the v3 columns.
+        // customStatement is the supported path; migrator.issueCustomQuery
+        // is the deprecated alias.
+        for (final ddl in _v1ToV2AlterStatements) {
+          await customStatement(ddl);
+        }
         await _backfillNormalizedColumns();
+      }
+      if (from < 3) {
+        // v2 → v3: the normalized columns were never read; the
+        // payload JSON is the only source of truth. Drop them.
+        await migrator.dropColumn(cardRecords, 'name_text');
+        await migrator.dropColumn(cardRecords, 'issuer_text');
+        await migrator.dropColumn(cardRecords, 'category_name');
+        await migrator.dropColumn(cardRecords, 'custom_category_text');
+        await migrator.dropColumn(cardRecords, 'card_type_name');
+        await migrator.dropColumn(
+          cardRecords,
+          'compatibility_status_name',
+        );
+        await migrator.dropColumn(cardRecords, 'search_text');
+        await migrator.dropColumn(cardRecords, 'is_archived');
+        await migrator.dropColumn(cardRecords, 'is_favorite');
       }
     },
   );
@@ -90,8 +118,7 @@ class CardDatabase extends _$CardDatabase {
   }
 
   Future<bool> isEmpty() async {
-    final count = await countCards();
-    return count == 0;
+    return (await countCards()) == 0;
   }
 
   Future<int> countCards() async {
@@ -132,15 +159,6 @@ class CardDatabase extends _$CardDatabase {
     return CardRecordsCompanion.insert(
       id: card.id,
       payloadJson: jsonEncode(card.toJson()),
-      nameText: Value(card.name),
-      issuerText: Value(card.issuer),
-      categoryName: Value(card.category.name),
-      customCategoryText: Value(card.customCategory),
-      cardTypeName: Value(card.cardType.name),
-      compatibilityStatusName: Value(card.compatibilityStatus.name),
-      searchText: Value(_searchTextForCard(card)),
-      isArchived: Value(card.archived),
-      isFavorite: Value(card.favorite),
       createdAtMillis: card.createdAt.millisecondsSinceEpoch,
       updatedAtMillis: card.updatedAt.millisecondsSinceEpoch,
     );
@@ -148,61 +166,72 @@ class CardDatabase extends _$CardDatabase {
 
   WalletCard? _tryDecodeRow(CardRecord row) {
     try {
-      return _cardFromRow(row);
+      final decoded = jsonDecode(row.payloadJson);
+      if (decoded is! Map<String, Object?>) {
+        throw FormatException(
+          'Card payload for ${row.id} is not a JSON object.',
+        );
+      }
+      return WalletCard.fromJson(decoded);
     } catch (error) {
-      // Corrupt or partially-written rows must not poison the entire
-      // loadCards() call — the user's other cards should still surface.
-      debugPrint('Skipping corrupt card ${row.id}: $error');
+      // Corrupt or partially-written rows must not poison the
+      // entire loadCards() call. The user's other cards should
+      // still surface.
+      // ignore: avoid_print
+      print('CardDatabase: skipping corrupt card ${row.id}: $error');
       return null;
     }
   }
 
-  WalletCard _cardFromRow(CardRecord row) {
-    final decoded = jsonDecode(row.payloadJson);
-    if (decoded is! Map<String, Object?>) {
-      throw FormatException(
-        'Card payload for ${row.id} is not a JSON object.',
-      );
-    }
-    return WalletCard.fromJson(decoded);
-  }
-
+  /// Populates the v2-only normalized columns from the payload JSON.
+  /// Used by the v1→v2 migration path. The columns are dropped again
+  /// in v3; this is only here to support users on v1/v2 installs
+  /// that haven't yet upgraded past v2.
   Future<void> _backfillNormalizedColumns() async {
     final rows = await select(cardRecords).get();
     for (final row in rows) {
       WalletCard? card;
       try {
-        card = _cardFromRow(row);
+        final decoded = jsonDecode(row.payloadJson);
+        if (decoded is! Map<String, Object?>) {
+          throw FormatException('Not a JSON object.');
+        }
+        card = WalletCard.fromJson(decoded);
       } catch (error) {
-        // A single corrupt row must not abort the v1→v2
-        // migration. The schema upgrade has already been applied;
-        // if we threw, every other card would lose its
-        // normalized columns and search would silently break.
-        // The row's payload is unchanged and loadCards() will
-        // skip it again at read time.
-        debugPrint('Skipping backfill for corrupt card ${row.id}: $error');
+        // A single corrupt row must not abort the migration.
+        // ignore: avoid_print
+        print(
+          'CardDatabase: skipping v1->v2 backfill for corrupt card '
+          '${row.id}: $error',
+        );
         continue;
       }
-      await (update(cardRecords)..where((tbl) => tbl.id.equals(row.id))).write(
-        CardRecordsCompanion(
-          nameText: Value(card.name),
-          issuerText: Value(card.issuer),
-          categoryName: Value(card.category.name),
-          customCategoryText: Value(card.customCategory),
-          cardTypeName: Value(card.cardType.name),
-          compatibilityStatusName: Value(card.compatibilityStatus.name),
-          searchText: Value(_searchTextForCard(card)),
-        ),
+      // The normalized columns were dropped from the v3
+      // CardRecords class, so the backfill is issued as raw SQL
+      // for forward compatibility.
+      await customStatement(
+        'UPDATE card_records SET '
+        'name_text = ?, '
+        'issuer_text = ?, '
+        'category_name = ?, '
+        'custom_category_text = ?, '
+        'card_type_name = ?, '
+        'compatibility_status_name = ?, '
+        'search_text = ? '
+        'WHERE id = ?',
+        [
+          card.name,
+          card.issuer,
+          card.category.name,
+          card.customCategory,
+          card.cardType.name,
+          card.compatibilityStatus.name,
+          _searchTextForCard(card),
+          row.id,
+        ],
       );
     }
   }
-
-  /// Visible for tests: re-runs the v1→v2 backfill. Production code
-  /// gets this for free via the migration strategy; tests use it to
-  /// drive the backfill against a database they have hand-corrupted
-  /// to simulate a partial-write scenario.
-  @visibleForTesting
-  Future<void> debugRerunBackfill() => _backfillNormalizedColumns();
 
   String _searchTextForCard(WalletCard card) {
     return <String>[
