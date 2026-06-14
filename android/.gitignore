@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Plaintext ANDROID_* secrets written by tools/generate-keystore.sh.
+# Paste the values into GitHub Secrets, then delete this file.
+keystore-details.txt

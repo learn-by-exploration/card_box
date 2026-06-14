@@ -319,3 +319,80 @@ Implication:
 - A future pass that picks up these features should write its own
   decision record and update `implementation_status.md` and
   `conops.md` in the same change.
+
+## DR-014: Accessibility Widget Initiative (2026-06-14)
+
+Date: 2026-06-14
+
+Decision: The card_box app will adopt a 4-tier accessibility widget
+initiative, starting with the cashier-facing barcode-presentation
+flow. The first deliverable is the `AnnounceableBarcode` widget
+(DR-014.a), followed by `CardDetailVoiceSummary` (DR-014.b) and
+`LargePrintBarcodeOverlay` (DR-014.c). A `TtsService` interface is
+introduced in `lib/services/tts_service.dart` so the TTS call is
+dependency-injected and unit-testable.
+
+Reasoning:
+
+- The central user flow ("open the app, show the cashier my member
+  number") is unusable by non-sighted users today. The barcode
+  image is visual-only; the `SelectableText` payload is not
+  wrapped in `Semantics`; no TTS path exists.
+- The failure is high-stakes: the user is standing at a cashier
+  with another person waiting, often with poor lighting and
+  background noise. Audio is the only reliable channel.
+- WCAG 2.2 SC 1.3.1 (Info and Relationships) and SC 4.1.2 (Name,
+  Role, Value) require the payload to be programmatically
+  determinable. The existing `BarcodeWidget` does not provide
+  this.
+- Google Play's "Accessibility" badge for an app that passes its
+  accessibility audit is a Play Store listing signal that
+  aligns with the existing COPPA / Families Policy positioning.
+
+Implication:
+
+- A new `lib/services/tts_service.dart` interface with a default
+  on-device implementation. Test environments and CI use a
+  no-op or fake TTS service.
+- The "Read aloud" feature is opt-in via a Settings toggle
+  (mirroring the existing `AppLockService` toggle pattern).
+  The `Semantics` label and 44 dp hit target are always
+  present.
+- The widget infrastructure (DR-014.a) is reusable: the
+  `Semantics` + TTS utility becomes the foundation for
+  `CardDetailVoiceSummary` (b) and `CardListWithAudioCues`
+  (tier-2 follow-up). Avoids per-screen roll-your-own.
+- A new section in `docs/v_model/plan.md` records the 12-widget
+  brainstorm so the work is preserved even if we ship only
+  the first 3 in v0.2.
+- All new widgets must satisfy: `Semantics(label:)` on every
+  interactive widget; 44 dp minimum hit target; WCAG 4.5:1
+  contrast (3:1 for large text); 200% text scale does not
+  break the layout. These are already in
+  `lib-screens.md §6`; the new widgets have explicit
+  widget tests for the hit-target and 200% scale contracts.
+
+Risks:
+
+- On-device TTS engines differ across Android vendors. The
+  default `flutter_tts` plugin hides most of this, but voice
+  quality and latency vary. Mitigation: provide a
+  "test voice" entry point in Settings so the user can
+  verify TTS works on their device before they need it at
+  the cashier.
+- `flutter_tts` is a plugin; it cannot run in a Flutter
+  `flutter test` environment. The widget tests must
+  therefore test the `Semantics` contract and the TTS
+  call argument via the injected fake, not the TTS output.
+
+Out of scope (deferred to a later accessibility pass):
+
+- Braille display output (already provided by Flutter's
+  `Semantics` for free).
+- A master "Accessible mode" toggle. The four individual
+  toggles (announce, haptics, contrast, voice-PIN) trade
+  off against each other; a single master switch would
+  be a footgun.
+- Custom gesture vocabulary. Build on TalkBack / VoiceOver
+  / switch control / external keyboard; do not invent a
+  new layer.
