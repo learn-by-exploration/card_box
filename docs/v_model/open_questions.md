@@ -37,9 +37,12 @@ question.
 
 6. **Should this be released only on GitHub first, or also prepared for
    Play Store/App Store/F-Droid?**
-   - Resolved for v0.1: GitHub only. Store-prep work (descriptions,
-     screenshots, signing, age-rating questionnaire) is out of scope
-     for the prototype.
+   - **Superseded 2026-06-13:** the v0.1 "GitHub only" resolution
+     stands, but Play Store preparation is now in scope as a separate
+     workstream. The signing infra, store listing copy, privacy/data-
+     safety pages, and the release process are in this repo. See
+     [`docs/release-process.md`](../release-process.md) and
+     `store_assets/`.
 
 7. **What name should the app use publicly: Card Box, Free Card Wallet,
    Open Card Box, or something else?**
@@ -69,6 +72,17 @@ question.
     - Resolved: office access card, supermarket loyalty card,
       metro/transit card, library card, and similar common cards.
       No private card numbers are recorded in test artifacts.
+
+## Resolved (2026-06-13)
+
+6a. **(Reversal of Q6, 2026-06-13.)** Q6 deferred store prep "for
+    v0.1". As of 2026-06-13, Play Store preparation is in scope
+    (signing infra, store listing copy, privacy/data-safety HTML,
+    release process, keystore-generation tool). The v0.1
+    "GitHub only" resolution still applies to the prototype's
+    distribution; the Play Store work is a parallel track. See
+    [`docs/release-process.md`](../release-process.md) and
+    `store_assets/`.
 
 ## Deferred (2026-06-13)
 

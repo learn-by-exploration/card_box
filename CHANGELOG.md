@@ -3,6 +3,49 @@
 All notable changes to the Card Box app are documented here.
 Stabilization work followed the plan in `docs/STABILIZATION_PLAN.md`.
 
+## [1.0.0] — 2026-06-13 — Play Store submission prep
+
+This release prepares Card Box for Google Play Store submission. No
+runtime behaviour changes. The five in-repo commits are:
+
+1. **`build(android): add release signing config and adaptive launcher icon`**
+   — release `signingConfigs` block (reads `android/key.properties`),
+     R8 minify/shrink/ProGuard, `targetSdk = 35`,
+     `lint.checkReleaseBuilds = true`, adaptive launcher icon, and the
+     ProGuard keep rules for `flutter_secure_storage`, Drift / sqlite3,
+     ML Kit, mobile_scanner, nfc_manager.
+2. **`docs(policy): add Card Box privacy policy and data safety HTML`**
+   — `docs/privacy-policy.html` and `docs/data-safety.html`, brand
+     colour `#1F6FEB`. The privacy policy's "Internet" section is
+     honest: Card Box does not hold the `INTERNET` permission.
+3. **`ci(web): fail loud if a static doc is missing`**
+   — dropped the `if [ -f ]` guard in the `build-web` static-docs
+     copy step.
+4. **`docs(store): add Google Play listing and closed-testing guides`**
+   — `store_assets/STORE_LISTING.md` (full Play Console copy) and
+     `store_assets/CLOSED_TESTING.md` (tester brief + production
+     pre-flight).
+5. **`chore(release): release-process docs and decision reversal`**
+   — `tools/generate-keystore.sh` (executable, prompts for password,
+     emits `android/keystore-details.txt` mode 600 with the four
+     `ANDROID_*` values), `docs/release-process.md` (single-page
+     runbook), `docs/screenshot-capture.md` (capture workflow), the
+     Q6 reversal in `docs/v_model/open_questions.md`, and this
+     changelog entry.
+
+**User-side steps (not in this repo):** see
+[`docs/release-process.md`](docs/release-process.md) §1 steps F–I.
+
+1. Run `bash tools/generate-keystore.sh` on a secure machine; paste
+   the four `ANDROID_*` values into GitHub Secrets.
+2. Capture screenshots per `docs/screenshot-capture.md`; drop the
+   PNGs in `store_assets/`; create the Play Console listing from
+   `store_assets/STORE_LISTING.md`.
+3. Download the signed AAB from the `build-android-release` Actions
+   artifact; upload to Closed testing; share the opt-in URL with
+   testers; promote to production after `store_assets/CLOSED_TESTING.md`
+   Part 6 passes.
+
 ## [Unreleased] — Stabilization
 
 ### Phase 1 — Data-loss stop-gaps (CRITICAL)
