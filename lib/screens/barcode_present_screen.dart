@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:card_box/models/wallet_card.dart';
+import 'package:card_box/services/tts_service.dart';
 import 'package:card_box/theme.dart';
-import 'package:card_box/widgets/barcode_preview.dart';
+import 'package:card_box/widgets/announceable_barcode.dart';
 
 class BarcodePresentScreen extends StatefulWidget {
   const BarcodePresentScreen({super.key, required this.card, this.onShown});
@@ -121,10 +122,21 @@ class _BarcodePresentScreenState extends State<BarcodePresentScreen> {
                     borderRadius: BorderRadius.circular(tokens.radiusSmall),
                   ),
                   child: Center(
-                    child: BarcodePreview(
+                    child: AnnounceableBarcode(
                       data: card.barcodePayload,
                       format: card.barcodeFormat,
+                      // The TTS *call* is gated by a Settings
+                      // toggle (DR-014.a). Until the Settings
+                      // wiring lands, the read-aloud button is
+                      // rendered but disabled; the Semantics
+                      // label is always present so a screen-
+                      // reader user can still long-press to hear
+                      // the payload via the OS TTS, even with the
+                      // in-app button disabled.
+                      tts: NoOpTtsService(),
+                      cardName: card.name,
                       height: 220,
+                      ttsEnabled: false,
                     ),
                   ),
                 ),

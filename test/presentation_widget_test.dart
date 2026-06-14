@@ -16,6 +16,7 @@ import 'package:card_box/screens/card_image_viewer_screen.dart';
 import 'package:card_box/screens/card_reference_present_screen.dart';
 import 'package:card_box/screens/contact_qr_screen.dart';
 import 'package:card_box/services/card_repository.dart';
+import 'package:card_box/widgets/announceable_barcode.dart';
 import 'package:card_box/widgets/barcode_preview.dart';
 import 'package:card_box/widgets/card_tile.dart';
 import 'package:card_box/widgets/stored_card_image.dart';
@@ -282,7 +283,7 @@ void main() {
       expect(find.text('Anytime Fitness'), findsOneWidget);
       expect(find.text('GYM-42'), findsOneWidget);
       expect(find.text('qr'), findsOneWidget);
-      expect(find.byType(BarcodePreview), findsOneWidget);
+      expect(find.byType(AnnounceableBarcode), findsOneWidget);
     });
 
     testWidgets('ContactQrScreen shows the QR presentation copy', (
@@ -303,6 +304,9 @@ void main() {
 
       expect(find.text('Scan to save contact'), findsOneWidget);
       expect(find.text('CourtSide Japan'), findsOneWidget);
+      // ContactQrScreen renders a contact-card QR (no read-aloud value —
+      // the on-screen text is what the recipient scans), so it still uses
+      // the plain BarcodePreview rather than the a11y wrapper.
       expect(find.byType(BarcodePreview), findsOneWidget);
       expect(find.textContaining('compact contact card'), findsOneWidget);
     });
@@ -379,7 +383,7 @@ void main() {
       expect(find.text('Barcode'), findsOneWidget);
       expect(find.text('QR'), findsOneWidget);
       expect(find.text('All'), findsOneWidget);
-      expect(find.byType(BarcodePreview), findsNothing);
+      expect(find.byType(AnnounceableBarcode), findsNothing);
 
       await tester.tap(find.text('QR'));
       await tester.pumpAndSettle();
